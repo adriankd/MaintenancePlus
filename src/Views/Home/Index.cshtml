@@ -1,0 +1,190 @@
+@{
+    ViewData["Title"] = "Upload Invoice";
+}
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Vehicle Maintenance Invoice</h3>
+            </div>
+            <div class="card-body">
+                <!-- Success Message -->
+                @if (!string.IsNullOrEmpty(ViewBag.Success))
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <h5><i class="fas fa-check-circle me-2"></i>Success!</h5>
+                        @ViewBag.Success
+                        @if (ViewBag.Confidence != null)
+                        {
+                            <br><strong>Confidence Score:</strong> @(((decimal)ViewBag.Confidence).ToString("F1"))@Html.Raw("%")
+                        }
+                        @if (ViewBag.InvoiceId != null)
+                        {
+                            <br><a href="@Url.Action("Details", "Home", new { id = ViewBag.InvoiceId })" class="btn btn-sm btn-outline-primary mt-2">
+                                <i class="fas fa-eye me-1"></i>View Invoice Details
+                            </a>
+                        }
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+
+                <!-- Error Message -->
+                @if (!string.IsNullOrEmpty(ViewBag.Error))
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Upload Failed</h5>
+                        @ViewBag.Error
+                        @if (ViewBag.Errors != null)
+                        {
+                            <ul class="mb-0 mt-2">
+                                @foreach (string error in ViewBag.Errors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        }
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+
+                <!-- Warning Messages -->
+                @if (ViewBag.Warnings != null && ((List<string>)ViewBag.Warnings).Any())
+                {
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <h5><i class="fas fa-exclamation-circle me-2"></i>Processing Warnings</h5>
+                        <p>The invoice was processed successfully, but some data was automatically generated:</p>
+                        <ul class="mb-0">
+                            @foreach (string warning in ViewBag.Warnings)
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+
+                <form action="/Home/Upload" method="post" enctype="multipart/form-data" class="upload-form">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Select Invoice File</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".pdf,.png" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Supported formats: PDF, PNG | Maximum size: 10MB
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="progress" id="uploadProgress" style="display: none;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="uploadBtn">
+                        <i class="fas fa-cloud-upload-alt me-2"></i>Upload and Process Invoice
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-pdf fa-3x text-danger mb-3"></i>
+                        <h5>PDF Invoices</h5>
+                        <p class="text-muted">Upload scanned or digital PDF invoices from any automotive service provider.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body text-center">
+                        <i class="fas fa-image fa-3x text-success mb-3"></i>
+                        <h5>PNG Images</h5>
+                        <p class="text-muted">Upload photos or scanned images of paper invoices in PNG format.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>How It Works</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-upload fa-2x text-primary mb-2"></i>
+                        <h6>1. Upload</h6>
+                        <p class="small text-muted">Select and upload your invoice file</p>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-eye fa-2x text-info mb-2"></i>
+                        <h6>2. Extract</h6>
+                        <p class="small text-muted">AI extracts data from the document</p>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-database fa-2x text-success mb-2"></i>
+                        <h6>3. Store</h6>
+                        <p class="small text-muted">Data is validated and stored</p>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <i class="fas fa-api fa-2x text-warning mb-2"></i>
+                        <h6>4. Access</h6>
+                        <p class="small text-muted">Access via web interface or API</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelector('.upload-form').addEventListener('submit', function(e) {
+            const fileInput = document.getElementById('file');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = progressDiv.querySelector('.progress-bar');
+
+            if (!fileInput.files.length) {
+                e.preventDefault();
+                alert('Please select a file to upload');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const maxSize = 10 * 1024 * 1024; // 10MB
+
+            if (file.size > maxSize) {
+                e.preventDefault();
+                alert('File size exceeds 10MB limit');
+                return;
+            }
+
+            const allowedTypes = ['application/pdf', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                e.preventDefault();
+                alert('Only PDF and PNG files are allowed');
+                return;
+            }
+
+            // Show progress and disable button
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+            progressDiv.style.display = 'block';
+            
+            // Simulate progress (in real implementation, this would be tied to actual upload progress)
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                progressBar.style.width = progress + '%';
+                if (progress >= 90) {
+                    clearInterval(interval);
+                }
+            }, 200);
+        });
+    </script>
+}

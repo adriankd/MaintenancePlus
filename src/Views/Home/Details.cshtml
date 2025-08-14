@@ -1,0 +1,271 @@
+@model VehicleMaintenanceInvoiceSystem.Models.InvoiceDetailsDto
+
+@{
+    ViewData["Title"] = $"Invoice {Model?.InvoiceNumber}";
+}
+
+<div class="row">
+    <div class="col-12">
+        @if (ViewBag.Error != null)
+        {
+            <div class="alert alert-danger">
+                <h4><i class="fas fa-exclamation-triangle me-2"></i>Error Loading Invoice Details</h4>
+                <p><strong>@ViewBag.Error</strong></p>
+                
+                @if (ViewBag.ErrorDetails != null)
+                {
+                    <hr />
+                    <details>
+                        <summary><strong>Technical Details (for debugging)</strong></summary>
+                        <pre class="mt-2 p-2 bg-light border rounded" style="font-size: 0.8em; max-height: 300px; overflow-y: auto;">@ViewBag.ErrorDetails</pre>
+                    </details>
+                }
+                
+                <hr />
+                <div class="mt-3">
+                    <h5>Possible Solutions:</h5>
+                    <ul>
+                        <li>If this is a "casting" or "decimal" error, the database schema needs to be updated</li>
+                        <li>Run the database fix script to convert integer columns to decimal columns</li>
+                        <li>Check the application logs for more details</li>
+                    </ul>
+                    <a href="/" class="btn btn-primary">← Back to Home</a>
+                    <a href="/Home/Invoices" class="btn btn-secondary">View All Invoices</a>
+                </div>
+            </div>
+        }
+        else if (Model != null)
+        {
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-file-invoice me-2"></i>Invoice Details</h2>
+                <div>
+                    <a href="@Url.Action("Invoices", "Home")" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to List
+                    </a>
+                    <a href="@Model.BlobFileUrl" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt me-2"></i>View Original File
+                    </a>
+                </div>
+            </div>
+
+            <!-- Invoice Header -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Invoice Information</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Invoice Number:</strong></td>
+                                    <td>@Model.InvoiceNumber</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Vehicle ID:</strong></td>
+                                    <td><span class="badge bg-secondary fs-6">@Model.VehicleID</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Invoice Date:</strong></td>
+                                    <td>@Model.InvoiceDate.ToString("MMMM dd, yyyy")</td>
+                                </tr>
+                                @if (Model.Odometer.HasValue)
+                                {
+                                    <tr>
+                                        <td><strong>Odometer:</strong></td>
+                                        <td>@Model.Odometer.Value.ToString("N0") miles</td>
+                                    </tr>
+                                }
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Total Cost:</strong></td>
+                                    <td><h5 class="text-success mb-0">$@Model.TotalCost.ToString("N2")</h5></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Parts Cost:</strong></td>
+                                    <td><span class="fs-5">$@Model.TotalPartsCost.ToString("N2")</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Labor Cost:</strong></td>
+                                    <td><span class="fs-5">$@Model.TotalLaborCost.ToString("N2")</span></td>
+                                </tr>
+                                @if (Model.ConfidenceScore.HasValue)
+                                {
+                                    <tr>
+                                        <td><strong>Confidence Score:</strong></td>
+                                        <td>
+                                            @{
+                                                var confidence = Model.ConfidenceScore.Value;
+                                                var badgeClass = confidence >= 90 ? "bg-success" : confidence >= 75 ? "bg-warning" : "bg-danger";
+                                            }
+                                            <span class="badge @badgeClass fs-6">@confidence.ToString("F1")%</span>
+                                        </td>
+                                    </tr>
+                                }
+                                <tr>
+                                    <td><strong>Processed:</strong></td>
+                                    <td>@Model.CreatedAt.ToString("MMMM dd, yyyy HH:mm")</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Line Items -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Line Items</h4>
+                    <span class="badge bg-light text-dark">@Model.LineItems.Count items</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.LineItems.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="5%">#</th>
+                                        <th width="35%">Description</th>
+                                        <th width="10%">Category</th>
+                                        <th width="10%">Unit Cost</th>
+                                        <th width="8%">Qty</th>
+                                        <th width="12%">Line Total</th>
+                                        <th width="10%">Part Number</th>
+                                        <th width="10%">Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var line in Model.LineItems.OrderBy(l => l.LineNumber))
+                                    {
+                                        <tr>
+                                            <td><strong>@line.LineNumber</strong></td>
+                                            <td>@line.Description</td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(line.Category))
+                                                {
+                                                    var categoryClass = line.Category switch 
+                                                    {
+                                                        "Parts" => "bg-primary",
+                                                        "Labor" => "bg-warning text-dark",
+                                                        "Tax" => "bg-info",
+                                                        "Fee" => "bg-secondary",
+                                                        _ => "bg-light text-dark"
+                                                    };
+                                                    <span class="badge @categoryClass">@line.Category</span>
+                                                }
+                                            </td>
+                                            <td>$@line.UnitCost.ToString("N2")</td>
+                                            <td>@line.Quantity.ToString("N1")</td>
+                                            <td><strong>$@line.TotalLineCost.ToString("N2")</strong></td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(line.PartNumber))
+                                                {
+                                                    <code>@line.PartNumber</code>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (line.ConfidenceScore.HasValue)
+                                                {
+                                                    var lineConfidence = line.ConfidenceScore.Value;
+                                                    var lineBadgeClass = lineConfidence >= 90 ? "bg-success" : lineConfidence >= 75 ? "bg-warning" : "bg-danger";
+                                                    <span class="badge @lineBadgeClass">@lineConfidence.ToString("F0")%</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <th colspan="5" class="text-end">Total:</th>
+                                        <th>$@Model.LineItems.Sum(l => l.TotalLineCost).ToString("N2")</th>
+                                        <th colspan="2"></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Summary Cards -->
+                        <div class="row mt-4">
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <i class="fas fa-cogs fa-2x text-primary mb-2"></i>
+                                        <h6>Parts</h6>
+                                        <h5 class="text-primary">$@Model.LineItems.Where(l => l.Category == "Parts").Sum(l => l.TotalLineCost).ToString("N2")</h5>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <i class="fas fa-wrench fa-2x text-warning mb-2"></i>
+                                        <h6>Labor</h6>
+                                        <h5 class="text-warning">$@Model.LineItems.Where(l => l.Category == "Labor").Sum(l => l.TotalLineCost).ToString("N2")</h5>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <i class="fas fa-receipt fa-2x text-info mb-2"></i>
+                                        <h6>Tax & Fees</h6>
+                                        <h5 class="text-info">$@Model.LineItems.Where(l => l.Category == "Tax" || l.Category == "Fee").Sum(l => l.TotalLineCost).ToString("N2")</h5>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card text-center">
+                                    <div class="card-body">
+                                        <i class="fas fa-list fa-2x text-secondary mb-2"></i>
+                                        <h6>Total Items</h6>
+                                        <h5 class="text-secondary">@Model.LineItems.Count</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No line items found</h5>
+                            <p class="text-muted">This invoice may not have detailed line item information.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- API Info -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-code me-2"></i>API Access</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">Access this invoice via API:</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <code>GET /api/invoices/@Model.InvoiceID</code>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <a href="/api/invoices/@Model.InvoiceID" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt me-1"></i>Try API
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>

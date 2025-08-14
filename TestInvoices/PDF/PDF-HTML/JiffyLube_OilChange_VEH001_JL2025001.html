@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Jiffy Lube Service Invoice</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: white; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .logo { font-size: 24px; font-weight: bold; color: #FFD700; }
+        .info { display: flex; justify-content: space-between; margin: 20px 0; }
+        .customer, .vehicle { border: 1px solid #ccc; padding: 10px; width: 45%; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+        th { background-color: #f0f0f0; }
+        .total { background-color: #ffffcc; font-weight: bold; }
+        .footer { margin-top: 30px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">JIFFY LUBE</div>
+        <div>Quick Oil Change & More</div>
+        <div>123 Main Street, Anytown, ST 12345 | (555) 123-4567</div>
+    </div>
+
+    <div class="info">
+        <div class="customer">
+            <h3>Customer Information</h3>
+            <p><strong>Name:</strong> John Smith</p>
+            <p><strong>Phone:</strong> (555) 987-6543</p>
+            <p><strong>Email:</strong> john.smith@email.com</p>
+        </div>
+        <div class="vehicle">
+            <h3>Vehicle Information</h3>
+            <p><strong>Vehicle ID:</strong> VEH-001</p>
+            <p><strong>Year/Make/Model:</strong> 2020 Honda Civic</p>
+            <p><strong>License:</strong> ABC-1234</p>
+            <p><strong>Odometer:</strong> 45,250</p>
+        </div>
+    </div>
+
+    <div style="text-align: right; margin: 20px 0;">
+        <p><strong>Invoice Number:</strong> JL-2025-001</p>
+        <p><strong>Date:</strong> August 14, 2025</p>
+        <p><strong>Service Advisor:</strong> Mike Johnson</p>
+    </div>
+
+    <h3>Services Performed</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Qty</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Oil Filter - Standard</td>
+                <td>1</td>
+                <td>$12.99</td>
+                <td>$12.99</td>
+            </tr>
+            <tr>
+                <td>5W-30 Conventional Oil (5 quarts)</td>
+                <td>1</td>
+                <td>$24.99</td>
+                <td>$24.99</td>
+            </tr>
+            <tr>
+                <td>Labor - Oil Change Service</td>
+                <td>1</td>
+                <td>$19.99</td>
+                <td>$19.99</td>
+            </tr>
+            <tr>
+                <td>Environmental Fee</td>
+                <td>1</td>
+                <td>$2.50</td>
+                <td>$2.50</td>
+            </tr>
+            <tr class="total">
+                <td colspan="3"><strong>Subtotal</strong></td>
+                <td><strong>$60.47</strong></td>
+            </tr>
+            <tr class="total">
+                <td colspan="3"><strong>Tax (8.25%)</strong></td>
+                <td><strong>$4.99</strong></td>
+            </tr>
+            <tr class="total">
+                <td colspan="3"><strong>TOTAL</strong></td>
+                <td><strong>$65.46</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Thank you for choosing Jiffy Lube!</p>
+        <p>Next service recommended at 48,250 miles</p>
+        <p>Warranty: 90 days or 3,000 miles</p>
+    </div>
+</body>
+</html>

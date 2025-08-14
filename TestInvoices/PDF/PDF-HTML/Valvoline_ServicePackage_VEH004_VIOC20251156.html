@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Valvoline Instant Oil Change Invoice</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: white; }
+        .header { background: linear-gradient(to right, #FFD700, #FFA500); text-align: center; padding: 15px; }
+        .logo { font-size: 26px; font-weight: bold; color: #000080; }
+        .location { font-size: 14px; margin-top: 10px; }
+        .invoice-info { display: flex; justify-content: space-between; margin: 20px 0; }
+        .box { border: 2px solid #000080; padding: 10px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #000080; padding: 8px; text-align: left; }
+        th { background-color: #000080; color: white; }
+        .service-line { background-color: #f0f8ff; }
+        .total-line { background-color: #FFD700; font-weight: bold; }
+        .recommendations { background-color: #fffacd; padding: 10px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Valvoline Instant Oil Change</div>
+        <div class="location">
+            Store #1247 - 890 Speed Lane, Fasttown, ST 13579<br>
+            Phone: (555) 456-7890 | Hours: Mon-Sat 8AM-8PM, Sun 9AM-6PM
+        </div>
+    </div>
+
+    <div class="invoice-info">
+        <div class="box" style="width: 30%;">
+            <h3>Customer</h3>
+            <p><strong>Lisa Thompson</strong></p>
+            <p>(555) 789-0123</p>
+            <p>lisa.t@email.com</p>
+        </div>
+        <div class="box" style="width: 30%;">
+            <h3>Vehicle</h3>
+            <p><strong>ID:</strong> TOYOTA-004</p>
+            <p><strong>Vehicle:</strong> 2021 Toyota Camry</p>
+            <p><strong>License:</strong> DEF-5678</p>
+            <p><strong>Mileage:</strong> 28,750</p>
+        </div>
+        <div class="box" style="width: 30%;">
+            <h3>Service Info</h3>
+            <p><strong>Invoice:</strong> VIOC-2025-1156</p>
+            <p><strong>Date:</strong> August 14, 2025</p>
+            <p><strong>Time:</strong> 2:45 PM</p>
+            <p><strong>Technician:</strong> Alex R.</p>
+        </div>
+    </div>
+
+    <h3>Service Package</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Service/Product</th>
+                <th>Type</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="service-line">
+                <td><strong>Full Service Oil Change Package</strong></td>
+                <td>Service</td>
+                <td>1</td>
+                <td>$49.99</td>
+                <td>$49.99</td>
+            </tr>
+            <tr>
+                <td>&nbsp;&nbsp;• MaxLife 5W-30 Oil (5 quarts)</td>
+                <td>Parts</td>
+                <td>5</td>
+                <td>Included</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>&nbsp;&nbsp;• Premium Oil Filter</td>
+                <td>Parts</td>
+                <td>1</td>
+                <td>Included</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>&nbsp;&nbsp;• 19-Point Inspection</td>
+                <td>Service</td>
+                <td>1</td>
+                <td>Included</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td>Windshield Washer Fluid Top-Off</td>
+                <td>Service</td>
+                <td>1</td>
+                <td>$3.99</td>
+                <td>$3.99</td>
+            </tr>
+            <tr>
+                <td>Environmental & Disposal Fee</td>
+                <td>Fee</td>
+                <td>1</td>
+                <td>$2.95</td>
+                <td>$2.95</td>
+            </tr>
+            <tr class="total-line">
+                <td colspan="4"><strong>Subtotal</strong></td>
+                <td><strong>$56.93</strong></td>
+            </tr>
+            <tr class="total-line">
+                <td colspan="4"><strong>Tax (6.5%)</strong></td>
+                <td><strong>$3.70</strong></td>
+            </tr>
+            <tr class="total-line" style="font-size: 16px;">
+                <td colspan="4"><strong>TOTAL</strong></td>
+                <td><strong>$60.63</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="recommendations">
+        <h4>Service Recommendations</h4>
+        <p>✓ <strong>Next Oil Change:</strong> 31,750 miles or 6 months</p>
+        <p>• <strong>Air Filter:</strong> Good condition - check at next service</p>
+        <p>• <strong>Cabin Filter:</strong> Recommend replacement in 3,000 miles</p>
+        <p>• <strong>Transmission Fluid:</strong> Service due at 60,000 miles</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; font-size: 12px; border-top: 1px solid #ccc; padding-top: 15px;">
+        <p><strong>Payment:</strong> Credit Card - Thank you!</p>
+        <p>Satisfaction Guaranteed - 90 Days or 3,000 Miles</p>
+        <p>Please visit www.valvoline.com to rate your experience</p>
+    </div>
+</body>
+</html>

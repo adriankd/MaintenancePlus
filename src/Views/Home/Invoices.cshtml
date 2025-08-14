@@ -1,0 +1,150 @@
+@model VehicleMaintenanceInvoiceSystem.Models.PaginatedResult<VehicleMaintenanceInvoiceSystem.Models.InvoiceSummaryDto>
+
+@{
+    ViewData["Title"] = "Invoices";
+}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0"><i class="fas fa-file-invoice me-2"></i>Processed Invoices</h3>
+                <a href="@Url.Action("Index", "Home")" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Upload New Invoice
+                </a>
+            </div>
+            <div class="card-body">
+                @if (ViewBag.Error != null)
+                {
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>@ViewBag.Error
+                    </div>
+                }
+                else if (Model != null && Model.Items.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Vehicle ID</th>
+                                    <th>Date</th>
+                                    <th>Total Cost</th>
+                                    <th>Parts Cost</th>
+                                    <th>Labor Cost</th>
+                                    <th>Confidence</th>
+                                    <th>Line Items</th>
+                                    <th>Processed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var invoice in Model.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>@invoice.InvoiceNumber</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary">@invoice.VehicleID</span>
+                                        </td>
+                                        <td>@invoice.InvoiceDate.ToString("MMM dd, yyyy")</td>
+                                        <td>
+                                            <strong class="text-success">$@invoice.TotalCost.ToString("N2")</strong>
+                                        </td>
+                                        <td>$@invoice.TotalPartsCost.ToString("N2")</td>
+                                        <td>$@invoice.TotalLaborCost.ToString("N2")</td>
+                                        <td>
+                                            @if (invoice.ConfidenceScore.HasValue)
+                                            {
+                                                var confidence = invoice.ConfidenceScore.Value;
+                                                var badgeClass = confidence >= 90 ? "bg-success" : confidence >= 75 ? "bg-warning" : "bg-danger";
+                                                <span class="badge @badgeClass">@confidence.ToString("F1")%</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">N/A</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">@invoice.LineItemCount</span>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                @invoice.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <a href="@Url.Action("Details", "Home", new { id = invoice.InvoiceID })" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    @if (Model.TotalPages > 1)
+                    {
+                        <nav aria-label="Invoice pagination">
+                            <ul class="pagination justify-content-center">
+                                <li class="page-item @(Model.HasPrevious ? "" : "disabled")">
+                                    <a class="page-link" href="@Url.Action("Invoices", "Home", new { page = Model.PageNumber - 1 })">
+                                        <i class="fas fa-chevron-left"></i> Previous
+                                    </a>
+                                </li>
+
+                                @for (int i = Math.Max(1, Model.PageNumber - 2); i <= Math.Min(Model.TotalPages, Model.PageNumber + 2); i++)
+                                {
+                                    <li class="page-item @(i == Model.PageNumber ? "active" : "")">
+                                        <a class="page-link" href="@Url.Action("Invoices", "Home", new { page = i })">@i</a>
+                                    </li>
+                                }
+
+                                <li class="page-item @(Model.HasNext ? "" : "disabled")">
+                                    <a class="page-link" href="@Url.Action("Invoices", "Home", new { page = Model.PageNumber + 1 })">
+                                        Next <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    }
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <p class="text-muted">
+                                Showing @((Model.PageNumber - 1) * Model.PageSize + 1) to 
+                                @Math.Min(Model.PageNumber * Model.PageSize, Model.TotalCount) 
+                                of @Model.TotalCount invoices
+                            </p>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <div class="btn-group" role="group">
+                                <a href="/api/invoices" class="btn btn-outline-secondary btn-sm" target="_blank">
+                                    <i class="fas fa-code me-1"></i>API Endpoint
+                                </a>
+                                <a href="/swagger" class="btn btn-outline-info btn-sm" target="_blank">
+                                    <i class="fas fa-book me-1"></i>API Docs
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">No invoices found</h5>
+                        <p class="text-muted">Upload your first invoice to get started!</p>
+                        <a href="@Url.Action("Index", "Home")" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Upload Invoice
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
