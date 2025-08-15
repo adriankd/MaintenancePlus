@@ -14,3 +14,15 @@ appsettings.Local.json
 *.db
 *.db-shm
 *.db-wal
+
+# Deployment and packaging files
+*.zip
+publish/
+*-publish/
+*-deploy/
+extracted/
+self-contained/
+windows-*/
+ef-default/
+quick-fix/
+app.zip
