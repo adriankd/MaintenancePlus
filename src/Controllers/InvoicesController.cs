@@ -194,4 +194,41 @@ public class InvoicesController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving invoices");
         }
     }
+
+    /// <summary>
+    /// Access original invoice file from blob storage
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <returns>Secure redirect to blob storage URL</returns>
+    [HttpGet("{id:int}/file")]
+    [ProducesResponseType(302)]
+    [ProducesResponseType(typeof(string), 404)]
+    [ProducesResponseType(typeof(string), 500)]
+    public async Task<IActionResult> GetInvoiceFile(int id)
+    {
+        try
+        {
+            _logger.LogInformation("File access requested for Invoice ID: {InvoiceId}", id);
+
+            // Get user identifier for audit logging (could be enhanced with authentication)
+            var userIdentifier = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+
+            var secureUrl = await _invoiceService.GetSecureFileUrlAsync(id, userIdentifier);
+
+            if (string.IsNullOrEmpty(secureUrl))
+            {
+                return NotFound($"Invoice file not found for ID {id}");
+            }
+
+            _logger.LogInformation("Redirecting to secure file URL for Invoice ID: {InvoiceId}", id);
+
+            // Return redirect to secure blob URL (per PRD requirement)
+            return Redirect(secureUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accessing file for invoice {InvoiceId}", id);
+            return StatusCode(500, "An error occurred while accessing the invoice file");
+        }
+    }
 }

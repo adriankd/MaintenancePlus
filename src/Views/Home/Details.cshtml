@@ -42,9 +42,14 @@
                     <a href="@Url.Action("Invoices", "Home")" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-2"></i>Back to List
                     </a>
-                    <a href="@Model.BlobFileUrl" target="_blank" class="btn btn-primary">
-                        <i class="fas fa-external-link-alt me-2"></i>View Original File
-                    </a>
+                    <div class="btn-group" role="group">
+                        <a href="/api/invoices/@Model.InvoiceID/file" target="_blank" class="btn btn-primary">
+                            <i class="fas fa-eye me-2"></i>View Original
+                        </a>
+                        <a href="/api/invoices/@Model.InvoiceID/file" download class="btn btn-outline-primary">
+                            <i class="fas fa-download me-2"></i>Download
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -253,9 +258,10 @@
                     <h5 class="mb-0"><i class="fas fa-code me-2"></i>API Access</h5>
                 </div>
                 <div class="card-body">
-                    <p class="mb-2">Access this invoice via API:</p>
-                    <div class="row">
+                    <p class="mb-3">Access this invoice and its original file via API:</p>
+                    <div class="row mb-2">
                         <div class="col-md-6">
+                            <strong>Invoice Data:</strong><br />
                             <code>GET /api/invoices/@Model.InvoiceID</code>
                         </div>
                         <div class="col-md-6 text-end">
@@ -263,6 +269,23 @@
                                 <i class="fas fa-external-link-alt me-1"></i>Try API
                             </a>
                         </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Original File Access:</strong><br />
+                            <code>GET /api/invoices/@Model.InvoiceID/file</code>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <a href="/api/invoices/@Model.InvoiceID/file" target="_blank" class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-file-alt me-1"></i>Access File
+                            </a>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            File access URLs are secure and expire after 1 hour for security purposes.
+                        </small>
                     </div>
                 </div>
             </div>

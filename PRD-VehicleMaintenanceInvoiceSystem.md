@@ -26,6 +26,7 @@ Develop a cloud-native C# web application that automates the extraction and proc
 - Processing time < 30 seconds per invoice
 - 99.9% API uptime
 - Support for 1000+ invoices per day
+- Secure file access with audit logging
 
 ---
 
@@ -36,13 +37,14 @@ The system processes vehicle maintenance invoices through the following workflow
 1. **Upload**: Users upload PDF/PNG invoice files via web interface
 2. **Extract**: OCR technology extracts structured data from documents
 3. **Store**: Structured data saved to Azure SQL Database
-4. **Archive**: Original files stored in Azure Blob Storage
+4. **Archive**: Original files stored in Azure Blob Storage with secure access
 5. **Access**: RESTful API provides data access for external systems
+6. **View**: Users can view/download original invoice files through secure links
 
 ### Target Users
 - **Primary**: Fleet managers and maintenance administrators
 - **Secondary**: External systems requiring invoice data integration
-- **Tertiary**: Auditors requiring document access
+- **Tertiary**: Auditors requiring document access and original file review
 
 ---
 
@@ -107,9 +109,20 @@ The system processes vehicle maintenance invoices through the following workflow
   - Maintain file metadata
   - Provide secure access URLs
 
+#### FR-007: Original File Access
+- **Description**: Provide user interface and API access to original invoice files stored in blob storage
+- **Acceptance Criteria**:
+  - Display "View Original" button/link on invoice details pages
+  - Support both in-browser viewing and file download
+  - Generate secure, time-limited access URLs for blob files
+  - Handle PDF files with inline browser viewing capability
+  - Handle PNG files with inline image display
+  - Provide fallback download option for unsupported browsers
+  - Log file access attempts for audit purposes
+
 ### 3.3 API Module
 
-#### FR-007: RESTful API
+#### FR-008: RESTful API
 - **Description**: Provide RESTful endpoints for data access
 - **Acceptance Criteria**:
   - Return JSON responses
@@ -117,9 +130,28 @@ The system processes vehicle maintenance invoices through the following workflow
   - Include proper HTTP status codes
   - Provide comprehensive error messages
 
----
+### 3.4 User Interface Module
 
-## 4. API Specifications
+#### FR-009: Invoice Details View
+- **Description**: Provide comprehensive invoice details page with original file access
+- **Acceptance Criteria**:
+  - Display all invoice header information in readable format
+  - Show line items in organized table format
+  - Include "View Original File" button/link prominently displayed
+  - Support in-browser PDF viewing for compatible browsers
+  - Support in-browser image viewing for PNG files
+  - Provide "Download Original" option as fallback
+  - Display file metadata (filename, size, upload date)
+  - Show loading indicators during file access operations
+
+#### FR-010: File Access Security
+- **Description**: Implement secure access controls for original invoice files
+- **Acceptance Criteria**:
+  - Generate time-limited SAS (Shared Access Signature) URLs for blob access
+  - Set 1-hour expiration on file access links
+  - Log all file access attempts with user identification
+  - Prevent direct blob URL exposure in client-side code
+  - Handle expired link scenarios gracefully with user-friendly messages
 
 ### Base URL
 ```
@@ -161,6 +193,13 @@ https://[app-name].azurewebsites.net/api
 - **Body**: Multipart form data with file
 - **Response**: Processing status and invoice ID
 
+#### GET /invoices/{id}/file
+- **Purpose**: Access original invoice file from blob storage
+- **Parameters**: `id` (required): Invoice ID
+- **Response**: Secure redirect to blob storage URL or file stream
+- **Security**: Time-limited access URL with 1-hour expiration
+- **Content-Type**: Preserves original file MIME type (application/pdf or image/png)
+
 ---
 
 ## 5. Non-Functional Requirements
@@ -176,6 +215,7 @@ https://[app-name].azurewebsites.net/api
 - **Data Encryption**: HTTPS for all communications
 - **Access Control**: Azure AD integration capability
 - **Audit Logging**: Track all data access and modifications
+- **File Access Logging**: Log original file view/download activities
 
 ### Reliability
 - **Availability**: 99.9% uptime SLA
@@ -228,7 +268,7 @@ Stores one record per invoice with summary information extracted from invoice he
 | TotalCost | DECIMAL(18,2) | NOT NULL | Grand total from invoice |
 | TotalPartsCost | DECIMAL(18,2) | NOT NULL | Calculated sum of parts lines |
 | TotalLaborCost | DECIMAL(18,2) | NOT NULL | Calculated sum of labor lines |
-| BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL |
+| BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL (used for generating secure access links) |
 | ExtractedData | NVARCHAR(MAX) | NULL | Raw JSON of extracted data |
 | ConfidenceScore | DECIMAL(5,2) | NULL | Overall extraction confidence |
 | CreatedAt | DATETIME | DEFAULT GETDATE() | Record creation time |
@@ -521,6 +561,8 @@ Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
 - [ ] Store data in Azure SQL Database
 - [ ] Provide basic API endpoints
 - [ ] Deploy to Azure App Service
+- [ ] Implement secure original file access (view/download functionality)
+- [ ] Display "View Original File" buttons on invoice details pages
 
 ### Phase 2 (Enhancement)
 - [ ] Implement vendor-specific custom models

@@ -15,6 +15,7 @@ public interface IInvoiceProcessingService
     Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20);
+    Task<string> GetSecureFileUrlAsync(int invoiceId, string? userIdentifier = null);
 }
 
 /// <summary>
@@ -217,7 +218,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
         
         try
         {
-            result.LineItems = invoice.InvoiceLines
+            result.LineItems = invoice.InvoiceLines?
                 .OrderBy(l => l.LineNumber)
                 .Select(l => {
                     _logger.LogDebug("Processing line item {LineNumber} for Invoice {InvoiceId}: Quantity={Quantity}, UnitCost={UnitCost}, TotalLineCost={TotalLineCost}", 
@@ -236,7 +237,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                         ConfidenceScore = l.ConfidenceScore
                     };
                 })
-                .ToList();
+                .ToList() ?? new List<InvoiceLineDto>();
                 
             _logger.LogInformation("Step 3 Success: Processed all line items for Invoice ID: {InvoiceId}", invoiceId);
         }
@@ -341,6 +342,49 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             PageNumber = page,
             PageSize = pageSize
         };
+    }
+
+    public async Task<string> GetSecureFileUrlAsync(int invoiceId, string? userIdentifier = null)
+    {
+        try
+        {
+            _logger.LogInformation("Generating secure file URL for Invoice ID: {InvoiceId}, User: {UserIdentifier}", 
+                invoiceId, userIdentifier ?? "Anonymous");
+
+            // Get invoice to retrieve blob URL
+            var invoice = await _context.InvoiceHeaders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+
+            if (invoice == null)
+            {
+                _logger.LogWarning("Invoice {InvoiceId} not found for file access request", invoiceId);
+                return string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(invoice.BlobFileUrl))
+            {
+                _logger.LogWarning("Invoice {InvoiceId} has no blob file URL", invoiceId);
+                return string.Empty;
+            }
+
+            // Generate secure URL with 1-hour expiration (per PRD)
+            var secureUrl = await _blobStorageService.GenerateSecureFileUrlAsync(invoice.BlobFileUrl, 1);
+
+            if (!string.IsNullOrEmpty(secureUrl))
+            {
+                // Log file access for audit purposes (per PRD requirement)
+                _logger.LogInformation("File access granted: Invoice {InvoiceId}, User: {UserIdentifier}, BlobUrl: {BlobUrl}", 
+                    invoiceId, userIdentifier ?? "Anonymous", invoice.BlobFileUrl);
+            }
+
+            return secureUrl;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating secure file URL for Invoice ID: {InvoiceId}", invoiceId);
+            return string.Empty;
+        }
     }
 
     private DataValidationResult ValidateInvoiceData(InvoiceData data)

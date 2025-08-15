@@ -33,6 +33,18 @@ public class FileUploadResponse
 }
 
 /// <summary>
+/// Information about a file stored in blob storage
+/// </summary>
+public class BlobFileInfo
+{
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long FileSize { get; set; }
+    public DateTime LastModified { get; set; }
+    public string BlobUrl { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Response model for invoice processing operations
 /// </summary>
 public class InvoiceProcessingResponse

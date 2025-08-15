@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using Microsoft.Extensions.Options;
 using VehicleMaintenanceInvoiceSystem.Models;
 
@@ -14,6 +15,8 @@ public interface IBlobStorageService
     Task<Stream?> DownloadFileAsync(string fileName);
     Task<bool> DeleteFileAsync(string fileName);
     Task<string> GetFileUrlAsync(string fileName);
+    Task<string> GenerateSecureFileUrlAsync(string blobUrl, int expirationHours = 1);
+    Task<BlobFileInfo?> GetFileInfoAsync(string blobUrl);
 }
 
 /// <summary>
@@ -157,6 +160,92 @@ public class BlobStorageService : IBlobStorageService
         {
             _logger.LogError(ex, "Error getting file URL for {FileName}", fileName);
             return string.Empty;
+        }
+    }
+
+    public async Task<string> GenerateSecureFileUrlAsync(string blobUrl, int expirationHours = 1)
+    {
+        try
+        {
+            // Extract the blob name from the full URL
+            var uri = new Uri(blobUrl);
+            var blobName = uri.Segments.Last();
+            
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_options.ContainerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            if (!await blobClient.ExistsAsync())
+            {
+                _logger.LogWarning("Blob {BlobName} does not exist for URL generation", blobName);
+                return string.Empty;
+            }
+
+            // Check if the blob client can generate SAS tokens
+            if (blobClient.CanGenerateSasUri)
+            {
+                var sasBuilder = new BlobSasBuilder
+                {
+                    BlobContainerName = _options.ContainerName,
+                    BlobName = blobName,
+                    Resource = "b",
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(expirationHours)
+                };
+
+                sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+                var sasUri = blobClient.GenerateSasUri(sasBuilder);
+                
+                _logger.LogInformation("Generated secure URL for blob {BlobName} with {ExpirationHours}h expiration", 
+                    blobName, expirationHours);
+                
+                return sasUri.ToString();
+            }
+            else
+            {
+                // Fallback to direct blob URL (less secure but functional)
+                _logger.LogWarning("Cannot generate SAS token for blob {BlobName}, returning direct URL", blobName);
+                return blobUrl;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating secure URL for blob {BlobUrl}", blobUrl);
+            return string.Empty;
+        }
+    }
+
+    public async Task<BlobFileInfo?> GetFileInfoAsync(string blobUrl)
+    {
+        try
+        {
+            // Extract the blob name from the full URL
+            var uri = new Uri(blobUrl);
+            var blobName = uri.Segments.Last();
+            
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_options.ContainerName);
+            var blobClient = containerClient.GetBlobClient(blobName);
+
+            if (!await blobClient.ExistsAsync())
+            {
+                return null;
+            }
+
+            var properties = await blobClient.GetPropertiesAsync();
+            var originalFileName = blobName.Contains('_') ? blobName.Substring(blobName.IndexOf('_') + 1) : blobName;
+
+            return new BlobFileInfo
+            {
+                FileName = originalFileName,
+                ContentType = properties.Value.ContentType ?? "application/octet-stream",
+                FileSize = properties.Value.ContentLength,
+                LastModified = properties.Value.LastModified.DateTime,
+                BlobUrl = blobUrl
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting file info for blob {BlobUrl}", blobUrl);
+            return null;
         }
     }
 }
