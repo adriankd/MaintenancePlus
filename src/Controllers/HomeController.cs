@@ -18,7 +18,7 @@ public class HomeController : Controller
     }
 
     /// <summary>
-    /// Home page with file upload interface
+    /// Home page with file upload interface. This is a test comment.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> Index()
