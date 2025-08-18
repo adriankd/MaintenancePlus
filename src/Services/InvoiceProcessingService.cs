@@ -16,6 +16,8 @@ public interface IInvoiceProcessingService
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20);
     Task<string> GetSecureFileUrlAsync(int invoiceId, string? userIdentifier = null);
+    Task<InvoiceActionResponse> ApproveInvoiceAsync(int invoiceId, string approvedBy);
+    Task<InvoiceActionResponse> RejectInvoiceAsync(int invoiceId);
 }
 
 /// <summary>
@@ -60,7 +62,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
             _logger.LogInformation("File uploaded successfully: {BlobUrl}", uploadResult.BlobUrl);
 
-            // Step 2: OCR Processing with Form Recognizer
+            // Step 2: Standard OCR Processing with Form Recognizer (revert to original)
             FormRecognizerResult ocrResult;
             using (var stream = file.OpenReadStream())
             {
@@ -165,6 +167,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                 TotalLaborCost = i.TotalLaborCost,
                 ConfidenceScore = i.ConfidenceScore,
                 CreatedAt = i.CreatedAt,
+                Approved = i.Approved,
+                ApprovedAt = i.ApprovedAt,
+                ApprovedBy = i.ApprovedBy,
                 LineItemCount = i.InvoiceLines.Count()
             })
             .ToListAsync();
@@ -211,7 +216,10 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             TotalLaborCost = invoice.TotalLaborCost,
             BlobFileUrl = invoice.BlobFileUrl,
             ConfidenceScore = invoice.ConfidenceScore,
-            CreatedAt = invoice.CreatedAt
+            CreatedAt = invoice.CreatedAt,
+            Approved = invoice.Approved,
+            ApprovedAt = invoice.ApprovedAt,
+            ApprovedBy = invoice.ApprovedBy
         };
 
         _logger.LogInformation("Step 3: Processing {LineItemCount} line items for Invoice ID: {InvoiceId}", invoice.InvoiceLines?.Count ?? 0, invoiceId);
@@ -289,6 +297,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                 TotalLaborCost = i.TotalLaborCost,
                 ConfidenceScore = i.ConfidenceScore,
                 CreatedAt = i.CreatedAt,
+                Approved = i.Approved,
+                ApprovedAt = i.ApprovedAt,
+                ApprovedBy = i.ApprovedBy,
                 LineItemCount = i.InvoiceLines.Count()
             })
             .ToListAsync();
@@ -331,6 +342,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                 TotalLaborCost = i.TotalLaborCost,
                 ConfidenceScore = i.ConfidenceScore,
                 CreatedAt = i.CreatedAt,
+                Approved = i.Approved,
+                ApprovedAt = i.ApprovedAt,
+                ApprovedBy = i.ApprovedBy,
                 LineItemCount = i.InvoiceLines.Count()
             })
             .ToListAsync();
@@ -384,6 +398,161 @@ public class InvoiceProcessingService : IInvoiceProcessingService
         {
             _logger.LogError(ex, "Error generating secure file URL for Invoice ID: {InvoiceId}", invoiceId);
             return string.Empty;
+        }
+    }
+
+    public async Task<InvoiceActionResponse> ApproveInvoiceAsync(int invoiceId, string approvedBy)
+    {
+        var response = new InvoiceActionResponse
+        {
+            InvoiceId = invoiceId,
+            Action = "approved"
+        };
+
+        try
+        {
+            _logger.LogInformation("Attempting to approve Invoice ID: {InvoiceId} by: {ApprovedBy}", invoiceId, approvedBy);
+
+            // Find the invoice
+            var invoice = await _context.InvoiceHeaders
+                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+
+            if (invoice == null)
+            {
+                response.Success = false;
+                response.Message = $"Invoice with ID {invoiceId} not found.";
+                _logger.LogWarning("Invoice {InvoiceId} not found for approval", invoiceId);
+                return response;
+            }
+
+            // Check if invoice is already approved
+            if (invoice.Approved)
+            {
+                response.Success = false;
+                response.Message = $"Invoice {invoice.InvoiceNumber} is already approved.";
+                response.ActionTimestamp = invoice.ApprovedAt;
+                response.ActionBy = invoice.ApprovedBy;
+                _logger.LogWarning("Invoice {InvoiceId} is already approved", invoiceId);
+                return response;
+            }
+
+            // Approve the invoice
+            invoice.Approved = true;
+            invoice.ApprovedAt = DateTime.Now;
+            invoice.ApprovedBy = approvedBy;
+
+            await _context.SaveChangesAsync();
+
+            response.Success = true;
+            response.Message = $"Invoice {invoice.InvoiceNumber} has been approved successfully.";
+            response.ActionTimestamp = invoice.ApprovedAt;
+            response.ActionBy = invoice.ApprovedBy;
+
+            _logger.LogInformation("Invoice {InvoiceId} approved successfully by {ApprovedBy} at {ApprovedAt}", 
+                invoiceId, approvedBy, invoice.ApprovedAt);
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            response.Success = false;
+            response.Message = "An error occurred while approving the invoice.";
+            _logger.LogError(ex, "Error approving Invoice ID: {InvoiceId}", invoiceId);
+            return response;
+        }
+    }
+
+    public async Task<InvoiceActionResponse> RejectInvoiceAsync(int invoiceId)
+    {
+        var response = new InvoiceActionResponse
+        {
+            InvoiceId = invoiceId,
+            Action = "rejected"
+        };
+
+        try
+        {
+            _logger.LogInformation("Attempting to reject (delete) Invoice ID: {InvoiceId}", invoiceId);
+
+            // Start a transaction to ensure atomicity
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                // Find the invoice with its line items
+                var invoice = await _context.InvoiceHeaders
+                    .Include(i => i.InvoiceLines)
+                    .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+
+                if (invoice == null)
+                {
+                    response.Success = false;
+                    response.Message = $"Invoice with ID {invoiceId} not found.";
+                    _logger.LogWarning("Invoice {InvoiceId} not found for rejection", invoiceId);
+                    return response;
+                }
+
+                // Store blob URL for cleanup
+                var blobUrl = invoice.BlobFileUrl;
+                var invoiceNumber = invoice.InvoiceNumber;
+
+                // Delete line items first (due to foreign key constraint)
+                if (invoice.InvoiceLines.Any())
+                {
+                    _context.InvoiceLines.RemoveRange(invoice.InvoiceLines);
+                    _logger.LogInformation("Removed {LineItemCount} line items for Invoice {InvoiceId}", 
+                        invoice.InvoiceLines.Count, invoiceId);
+                }
+
+                // Delete the invoice header
+                _context.InvoiceHeaders.Remove(invoice);
+
+                // Save database changes
+                await _context.SaveChangesAsync();
+
+                // Commit the transaction
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Invoice {InvoiceId} deleted from database successfully", invoiceId);
+
+                // Delete the file from blob storage
+                if (!string.IsNullOrEmpty(blobUrl))
+                {
+                    try
+                    {
+                        await _blobStorageService.DeleteFileAsync(blobUrl);
+                        _logger.LogInformation("Blob file deleted successfully for Invoice {InvoiceId}: {BlobUrl}", 
+                            invoiceId, blobUrl);
+                    }
+                    catch (Exception blobEx)
+                    {
+                        _logger.LogWarning(blobEx, "Failed to delete blob file for Invoice {InvoiceId}: {BlobUrl}", 
+                            invoiceId, blobUrl);
+                        // Don't fail the entire operation if blob deletion fails
+                    }
+                }
+
+                response.Success = true;
+                response.Message = $"Invoice {invoiceNumber} has been rejected and permanently deleted.";
+                response.ActionTimestamp = DateTime.Now;
+
+                _logger.LogInformation("Invoice {InvoiceId} rejected and deleted successfully", invoiceId);
+
+                return response;
+            }
+            catch (Exception)
+            {
+                // Rollback transaction on error
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            response.Success = false;
+            response.Message = "An error occurred while rejecting the invoice.";
+            _logger.LogError(ex, "Error rejecting Invoice ID: {InvoiceId}", invoiceId);
+            return response;
         }
     }
 

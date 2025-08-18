@@ -54,6 +54,23 @@ public class InvoiceHeader
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+    /// <summary>
+    /// Indicates whether this invoice has been approved for payment
+    /// </summary>
+    [Required]
+    public bool Approved { get; set; } = false;
+
+    /// <summary>
+    /// Timestamp when the invoice was approved (null if not approved)
+    /// </summary>
+    public DateTime? ApprovedAt { get; set; }
+
+    /// <summary>
+    /// User identifier who approved the invoice (null if not approved)
+    /// </summary>
+    [StringLength(100)]
+    public string? ApprovedBy { get; set; }
+
     // Navigation property
     public virtual ICollection<InvoiceLine> InvoiceLines { get; set; } = new List<InvoiceLine>();
 }

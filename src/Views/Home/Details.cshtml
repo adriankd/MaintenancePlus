@@ -50,6 +50,25 @@
                             <i class="fas fa-download me-2"></i>Download
                         </a>
                     </div>
+                    
+                    @* Approval Controls *@
+                    @if (!Model.Approved)
+                    {
+                        <div class="btn-group ms-2" role="group">
+                            <button type="button" class="btn btn-success" onclick="approveInvoice(@Model.InvoiceID)">
+                                <i class="fas fa-check me-2"></i>Approve
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="rejectInvoice(@Model.InvoiceID)">
+                                <i class="fas fa-times me-2"></i>Reject
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success fs-6 ms-2">
+                            <i class="fas fa-check me-1"></i>Approved
+                        </span>
+                    }
                 </div>
             </div>
 
@@ -114,6 +133,28 @@
                                     <td><strong>Processed:</strong></td>
                                     <td>@Model.CreatedAt.ToString("MMMM dd, yyyy HH:mm")</td>
                                 </tr>
+                                @if (Model.Approved)
+                                {
+                                    <tr>
+                                        <td><strong>Approval Status:</strong></td>
+                                        <td><span class="badge bg-success fs-6">Approved</span></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Approved By:</strong></td>
+                                        <td>@Model.ApprovedBy</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Approved At:</strong></td>
+                                        <td>@Model.ApprovedAt?.ToString("MMMM dd, yyyy HH:mm")</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td><strong>Approval Status:</strong></td>
+                                        <td><span class="badge bg-warning fs-6">Pending Approval</span></td>
+                                    </tr>
+                                }
                             </table>
                         </div>
                     </div>
@@ -292,3 +333,83 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // Approve invoice function
+        async function approveInvoice(invoiceId) {
+            const approverName = prompt("Enter your name for approval:");
+            
+            if (!approverName || approverName.trim() === '') {
+                alert('Approver name is required.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to approve this invoice?\n\nThis action will mark the invoice as approved for payment.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/invoices/${invoiceId}/approve`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        approvedBy: approverName.trim()
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert(`Success: ${result.message}`);
+                    location.reload(); // Refresh the page to show updated status
+                } else {
+                    alert(`Error: ${result.message || 'Failed to approve invoice'}`);
+                }
+            } catch (error) {
+                console.error('Error approving invoice:', error);
+                alert('An error occurred while approving the invoice. Please try again.');
+            }
+        }
+
+        // Reject invoice function
+        async function rejectInvoice(invoiceId) {
+            const confirmed = confirm(`Are you sure you want to REJECT this invoice?\n\n⚠️ WARNING: This action will PERMANENTLY DELETE the invoice and its associated file from the system.\n\nThis action cannot be undone.`);
+            
+            if (!confirmed) {
+                return;
+            }
+
+            // Double confirmation for destructive action
+            const doubleConfirm = confirm(`FINAL CONFIRMATION:\n\nYou are about to permanently delete this invoice and its file.\n\nType YES to confirm this destructive action.`);
+            
+            if (!doubleConfirm) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/invoices/${invoiceId}/reject`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert(`Success: ${result.message}`);
+                    // Redirect to invoice list since the invoice is deleted
+                    window.location.href = '/Home/Invoices';
+                } else {
+                    alert(`Error: ${result.message || 'Failed to reject invoice'}`);
+                }
+            } catch (error) {
+                console.error('Error rejecting invoice:', error);
+                alert('An error occurred while rejecting the invoice. Please try again.');
+            }
+        }
+    </script>
+}

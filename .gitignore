@@ -351,6 +351,8 @@ quick-fix/
 app.zip
 deploy*.zip
 webapp_logs.zip
+deploy-to-azure.ps1
+file-access-deploy.zip
 
 # Test files and temporary scripts
 test-*.ps1
@@ -358,13 +360,31 @@ quick-test.ps1
 restart-with-logging.ps1
 check-schema.ps1
 test-error-details.ps1
+test-invoices.ps1
+test-upload.ps1
+test-app-status.ps1
 
-# Environment specific scripts
+# Environment specific scripts and files
 fix-*.ps1
 fix-*.bat
 fix-*.sql
 deploy-*.ps1
+deploy-new-plan.ps1
 setup-*.ps1
+run-app.ps1
+fix-azure-deployment.ps1
+
+# SQL Migration and setup files
+*Migration*.sql
+Manual-*.sql
+*-Schema.sql
+Add-*-Fields*.sql
+
+# Documentation and deployment notes (project specific)
+*_NOTES.md
+*_FIX.md
+DEPLOYMENT_NOTES.md
+AZURE_*.md
 
 # Personal notes and temp files
 notes.txt

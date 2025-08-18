@@ -3,8 +3,8 @@
 
 ### Document Information
 - **Product Name**: Vehicle Maintenance Invoice Processing System
-- **Version**: 1.0
-- **Date**: August 14, 2025
+- **Version**: 1.1
+- **Date**: August 18, 2025
 - **Product Manager**: [To be assigned]
 - **Development Team**: 2 Developers (Backend/Frontend)
 
@@ -38,8 +38,10 @@ The system processes vehicle maintenance invoices through the following workflow
 2. **Extract**: OCR technology extracts structured data from documents
 3. **Store**: Structured data saved to Azure SQL Database
 4. **Archive**: Original files stored in Azure Blob Storage with secure access
-5. **Access**: RESTful API provides data access for external systems
-6. **View**: Users can view/download original invoice files through secure links
+5. **Review**: Users can view invoice details and approve or reject the processed invoice
+6. **Approve/Reject**: Users can approve invoices for final acceptance or reject and delete them
+7. **Access**: RESTful API provides data access for external systems
+8. **View**: Users can view/download original invoice files through secure links
 
 ### Target Users
 - **Primary**: Fleet managers and maintenance administrators
@@ -153,6 +155,76 @@ The system processes vehicle maintenance invoices through the following workflow
   - Prevent direct blob URL exposure in client-side code
   - Handle expired link scenarios gracefully with user-friendly messages
 
+#### FR-014: Enhanced Invoice Details UI
+- **Description**: Update invoice details page to support approval workflow
+- **Acceptance Criteria**:
+  - Display approval status badge prominently at the top of invoice details
+  - Show "Pending Approval" badge in yellow/orange for unapproved invoices
+  - Show "Approved" badge in green with approval date for approved invoices
+  - Position "Approve" and "Reject" buttons prominently near the top of the page
+  - Use distinct colors: Green for "Approve" button, Red for "Reject" button
+  - Include icons on buttons for better UX (checkmark for approve, X for reject)
+  - Show approval details (date, user) when invoice is approved
+  - Disable/hide approval buttons for already approved invoices
+  - Maintain existing "View Original File" functionality
+  - Responsive design for mobile and desktop viewing
+
+#### FR-015: Confirmation Dialog System
+- **Description**: Implement user-friendly confirmation dialogs for critical actions
+- **Acceptance Criteria**:
+  - **Approve Confirmation**:
+    - Title: "Approve Invoice"
+    - Message: "Are you sure you want to approve this invoice? Once approved, it cannot be rejected or modified."
+    - Buttons: "Yes, Approve" (green), "Cancel" (gray)
+  - **Reject Confirmation**:
+    - Title: "Reject Invoice"  
+    - Message: "⚠️ Are you sure you want to reject this invoice? This will permanently delete the invoice data and original file. This action cannot be undone."
+    - Buttons: "Yes, Delete Forever" (red), "Cancel" (gray)
+  - **Success Messages**:
+    - Approval: "✓ Invoice has been approved successfully"
+    - Rejection: "✓ Invoice has been rejected and removed from the system"
+  - **Error Handling**: Display user-friendly error messages if operations fail
+  - Use modal dialogs that overlay the current page
+  - Implement proper focus management and keyboard navigation
+
+### 3.5 Invoice Approval Module
+
+#### FR-011: Invoice Approval Process
+- **Description**: Provide approval workflow for processed invoices with database status tracking
+- **Acceptance Criteria**:
+  - Display "Approve" button on invoice details page for unapproved invoices
+  - Update `Approved` column in database to `true` when invoice is approved
+  - Show visual confirmation when invoice status changes to approved
+  - Display approval status clearly on invoice details page
+  - Provide confirmation popup before approving: "Are you sure you want to approve this invoice?"
+  - Only show "Approve" button for invoices with `Approved = false`
+  - Track approval timestamp and user information
+
+#### FR-012: Invoice Rejection Process
+- **Description**: Provide rejection workflow that removes rejected invoices and files completely
+- **Acceptance Criteria**:
+  - Display "Reject" button on invoice details page for unapproved invoices
+  - Show confirmation popup before rejecting: "Are you sure you want to reject this invoice? This will permanently delete the invoice data and original file."
+  - When rejected, perform the following actions atomically:
+    - Delete original file from Azure Blob Storage
+    - Delete all invoice line items from InvoiceLines table
+    - Delete invoice header record from InvoiceHeader table
+  - Redirect user to upload page after successful rejection
+  - Display success message: "Invoice has been rejected and removed from the system"
+  - Handle errors gracefully if deletion fails (e.g., file already deleted, database constraints)
+  - Log all rejection actions for audit purposes
+  - Only show "Reject" button for invoices with `Approved = false`
+
+#### FR-013: Approval Status Management
+- **Description**: Manage invoice approval states and user interface updates
+- **Acceptance Criteria**:
+  - Add `Approved` boolean column to InvoiceHeader table with default value `false`
+  - Display approval status badge on invoice details page ("Pending Approval" / "Approved")
+  - Hide both "Approve" and "Reject" buttons for already approved invoices (`Approved = true`)
+  - Show approval date and user information for approved invoices
+  - Include approval status in API responses
+  - Add approval status filter to invoice list views
+
 ### Base URL
 ```
 https://[app-name].azurewebsites.net/api
@@ -192,6 +264,19 @@ https://[app-name].azurewebsites.net/api
 - **Purpose**: Upload and process new invoice
 - **Body**: Multipart form data with file
 - **Response**: Processing status and invoice ID
+
+#### PUT /invoices/{id}/approve
+- **Purpose**: Approve a processed invoice
+- **Parameters**: `id` (required): Invoice ID
+- **Response**: Success status and updated invoice data
+- **Validation**: Only invoices with `Approved = false` can be approved
+
+#### DELETE /invoices/{id}/reject
+- **Purpose**: Reject and permanently delete an invoice
+- **Parameters**: `id` (required): Invoice ID  
+- **Response**: Success status confirmation
+- **Actions**: Deletes blob file, invoice lines, and invoice header
+- **Validation**: Only invoices with `Approved = false` can be rejected
 
 #### GET /invoices/{id}/file
 - **Purpose**: Access original invoice file from blob storage
@@ -269,6 +354,9 @@ Stores one record per invoice with summary information extracted from invoice he
 | TotalPartsCost | DECIMAL(18,2) | NOT NULL | Calculated sum of parts lines |
 | TotalLaborCost | DECIMAL(18,2) | NOT NULL | Calculated sum of labor lines |
 | BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL (used for generating secure access links) |
+| Approved | BIT | NOT NULL, DEFAULT 0 | Approval status (false=pending, true=approved) |
+| ApprovedAt | DATETIME2 | NULL | Timestamp when invoice was approved |
+| ApprovedBy | NVARCHAR(100) | NULL | User who approved the invoice |
 | ExtractedData | NVARCHAR(MAX) | NULL | Raw JSON of extracted data |
 | ConfidenceScore | DECIMAL(5,2) | NULL | Overall extraction confidence |
 | CreatedAt | DATETIME | DEFAULT GETDATE() | Record creation time |
@@ -305,7 +393,46 @@ InvoiceHeader (1) -----> (Many) InvoiceLines
 
 ---
 
-## 8. Multi-Vendor Invoice Format Strategy
+## 8. Technical Implementation Notes
+
+### 8.1 Database Schema Changes
+The approval feature requires adding new columns to the existing `InvoiceHeader` table:
+
+```sql
+-- Add approval columns to existing InvoiceHeader table
+ALTER TABLE InvoiceHeader 
+ADD Approved BIT NOT NULL DEFAULT 0,
+    ApprovedAt DATETIME2 NULL,
+    ApprovedBy NVARCHAR(100) NULL;
+
+-- Create index for approval status queries
+CREATE NONCLUSTERED INDEX IX_InvoiceHeader_Approved 
+    ON InvoiceHeader (Approved);
+```
+
+### 8.2 API Implementation Notes
+- **Approval Endpoint**: `PUT /api/invoices/{id}/approve` should be idempotent
+- **Rejection Endpoint**: `DELETE /api/invoices/{id}/reject` must handle cascading deletions
+- **Transaction Management**: Rejection process requires database transaction to ensure atomicity
+- **Blob Deletion**: Must handle cases where blob file may already be deleted or inaccessible
+- **Error Handling**: Provide detailed error responses for partial failures
+
+### 8.3 Frontend Implementation Notes
+- **JavaScript Confirmation Dialogs**: Use modern modal dialogs instead of basic `confirm()`
+- **State Management**: Update UI state immediately after successful operations
+- **Loading States**: Show loading indicators during async operations
+- **Error Display**: Implement toast notifications or inline error messages
+- **Accessibility**: Ensure confirmation dialogs are screen reader accessible
+
+### 8.4 Security Considerations
+- **Authorization**: Implement proper authorization checks for approval/rejection actions
+- **Audit Logging**: Log all approval/rejection actions with user identification
+- **Input Validation**: Validate invoice ID and approval state before processing
+- **Rate Limiting**: Consider implementing rate limits on approval/rejection endpoints
+
+---
+
+## 9. Multi-Vendor Invoice Format Strategy
 
 ### Supported Invoice Variations
 
@@ -490,12 +617,12 @@ Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
 
 ---
 
-## 9. Development Timeline (18 Working Days)
+## 10. Development Timeline (20 Working Days)
 
 ### Sprint 1: Foundation (Days 1-5)
 **Objectives**: Infrastructure setup and basic file handling
 - Azure resource provisioning
-- Database schema implementation
+- Database schema implementation (including approval columns)
 - Basic web application structure
 - File upload functionality
 - Blob storage integration
@@ -505,21 +632,30 @@ Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
 - Azure Form Recognizer integration for multi-vendor support
 - Data extraction pipeline with format detection
 - Vendor-specific extraction logic
-- Database data access layer
+- Database data access layer with approval status
 - Error handling and logging
 - Basic API endpoints
 
 ### Sprint 3: API Development (Days 11-15)
-**Objectives**: Complete API implementation
-- All REST endpoints implementation
+**Objectives**: Complete API implementation including approval workflow
+- All REST endpoints implementation (including approve/reject)
+- Approval/rejection business logic with cascading deletions
 - API documentation (Swagger)
 - Unit testing framework
 - Integration testing
 - Performance optimization
 
-### Sprint 4: Testing & Deployment (Days 16-18)
+### Sprint 4: UI Enhancement (Days 16-18)
+**Objectives**: Approval workflow user interface
+- Invoice details page updates with approval status
+- Approve/Reject buttons with confirmation dialogs
+- Success/error message handling
+- Responsive design updates
+- Frontend validation and state management
+
+### Sprint 5: Testing & Deployment (Days 19-20)
 **Objectives**: Production readiness
-- End-to-end testing
+- End-to-end testing including approval workflow
 - Load testing
 - Security testing
 - Production deployment
@@ -527,7 +663,7 @@ Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
 
 ---
 
-## 10. Risk Assessment
+## 11. Risk Assessment
 
 ### High Priority Risks
 1. **Vendor Format Variability**: Different vendors may have significantly different invoice layouts
@@ -563,14 +699,21 @@ Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
 - [ ] Deploy to Azure App Service
 - [ ] Implement secure original file access (view/download functionality)
 - [ ] Display "View Original File" buttons on invoice details pages
+- [ ] **NEW: Implement invoice approval/rejection workflow**
+- [ ] **NEW: Add approval status tracking with database column**
+- [ ] **NEW: Provide confirmation dialogs for all approval/rejection actions**
+- [ ] **NEW: Implement complete invoice deletion on rejection (blob + database)**
 
 ### Phase 2 (Enhancement)
 - [ ] Implement vendor-specific custom models
 - [ ] Add batch processing capabilities
 - [ ] Enhance format detection and classification
 - [ ] Add comprehensive monitoring and alerts
-- [ ] Implement audit logging
+- [ ] Implement audit logging for approval/rejection actions
 - [ ] Support additional vendor formats
+- [ ] **NEW: Add bulk approval/rejection capabilities**
+- [ ] **NEW: Implement approval workflow with multiple approval levels**
+- [ ] **NEW: Add approval history and audit trail**
 
 ---
 

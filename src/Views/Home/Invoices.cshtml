@@ -30,10 +30,9 @@
                                     <th>Vehicle ID</th>
                                     <th>Date</th>
                                     <th>Total Cost</th>
-                                    <th>Parts Cost</th>
-                                    <th>Labor Cost</th>
                                     <th>Confidence</th>
                                     <th>Line Items</th>
+                                    <th>Approval Status</th>
                                     <th>Processed</th>
                                     <th>Actions</th>
                                 </tr>
@@ -52,8 +51,6 @@
                                         <td>
                                             <strong class="text-success">$@invoice.TotalCost.ToString("N2")</strong>
                                         </td>
-                                        <td>$@invoice.TotalPartsCost.ToString("N2")</td>
-                                        <td>$@invoice.TotalLaborCost.ToString("N2")</td>
                                         <td>
                                             @if (invoice.ConfidenceScore.HasValue)
                                             {
@@ -68,6 +65,20 @@
                                         </td>
                                         <td>
                                             <span class="badge bg-info">@invoice.LineItemCount</span>
+                                        </td>
+                                        <td>
+                                            @if (invoice.Approved)
+                                            {
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Approved
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-clock me-1"></i>Pending
+                                                </span>
+                                            }
                                         </td>
                                         <td>
                                             <small class="text-muted">

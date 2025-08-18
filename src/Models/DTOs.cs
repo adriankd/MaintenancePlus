@@ -85,6 +85,9 @@ public class InvoiceSummaryDto
     public decimal TotalLaborCost { get; set; }
     public decimal? ConfidenceScore { get; set; }
     public DateTime CreatedAt { get; set; }
+    public bool Approved { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string? ApprovedBy { get; set; }
     public int LineItemCount { get; set; }
 }
 
@@ -104,6 +107,9 @@ public class InvoiceDetailsDto
     public string BlobFileUrl { get; set; } = string.Empty;
     public decimal? ConfidenceScore { get; set; }
     public DateTime CreatedAt { get; set; }
+    public bool Approved { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string? ApprovedBy { get; set; }
     public List<InvoiceLineDto> LineItems { get; set; } = new();
 }
 
@@ -121,4 +127,25 @@ public class InvoiceLineDto
     public string? PartNumber { get; set; }
     public string? Category { get; set; }
     public decimal? ConfidenceScore { get; set; }
+}
+
+/// <summary>
+/// Request model for approving an invoice
+/// </summary>
+public class ApproveInvoiceRequest
+{
+    public string ApprovedBy { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Response model for approval/rejection operations
+/// </summary>
+public class InvoiceActionResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int InvoiceId { get; set; }
+    public string Action { get; set; } = string.Empty; // "approved" or "rejected"
+    public DateTime? ActionTimestamp { get; set; }
+    public string? ActionBy { get; set; }
 }

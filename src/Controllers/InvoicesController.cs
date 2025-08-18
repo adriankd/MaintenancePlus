@@ -231,4 +231,81 @@ public class InvoicesController : ControllerBase
             return StatusCode(500, "An error occurred while accessing the invoice file");
         }
     }
+
+    /// <summary>
+    /// Approve an invoice for payment
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <param name="request">Approval request with approver information</param>
+    /// <returns>Approval confirmation</returns>
+    [HttpPut("{id:int}/approve")]
+    [ProducesResponseType(typeof(InvoiceActionResponse), 200)]
+    [ProducesResponseType(typeof(string), 400)]
+    [ProducesResponseType(typeof(string), 404)]
+    [ProducesResponseType(typeof(string), 500)]
+    public async Task<IActionResult> ApproveInvoice(int id, [FromBody] ApproveInvoiceRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request?.ApprovedBy))
+            {
+                return BadRequest("ApprovedBy field is required");
+            }
+
+            _logger.LogInformation("Approval requested for Invoice ID: {InvoiceId} by: {ApprovedBy}", id, request.ApprovedBy);
+
+            var result = await _invoiceService.ApproveInvoiceAsync(id, request.ApprovedBy);
+
+            if (result.Success)
+            {
+                _logger.LogInformation("Invoice {InvoiceId} approved successfully", id);
+                return Ok(result);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to approve Invoice {InvoiceId}: {Message}", id, result.Message);
+                return BadRequest(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error approving invoice {InvoiceId}", id);
+            return StatusCode(500, "An error occurred while approving the invoice");
+        }
+    }
+
+    /// <summary>
+    /// Reject an invoice (permanently delete it)
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <returns>Rejection confirmation</returns>
+    [HttpDelete("{id:int}/reject")]
+    [ProducesResponseType(typeof(InvoiceActionResponse), 200)]
+    [ProducesResponseType(typeof(string), 404)]
+    [ProducesResponseType(typeof(string), 500)]
+    public async Task<IActionResult> RejectInvoice(int id)
+    {
+        try
+        {
+            _logger.LogInformation("Rejection requested for Invoice ID: {InvoiceId}", id);
+
+            var result = await _invoiceService.RejectInvoiceAsync(id);
+
+            if (result.Success)
+            {
+                _logger.LogInformation("Invoice {InvoiceId} rejected and deleted successfully", id);
+                return Ok(result);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to reject Invoice {InvoiceId}: {Message}", id, result.Message);
+                return BadRequest(result);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rejecting invoice {InvoiceId}", id);
+            return StatusCode(500, "An error occurred while rejecting the invoice");
+        }
+    }
 }
