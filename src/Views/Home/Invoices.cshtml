@@ -55,7 +55,7 @@
                                             @if (invoice.ConfidenceScore.HasValue)
                                             {
                                                 var confidence = invoice.ConfidenceScore.Value;
-                                                var badgeClass = confidence >= 90 ? "bg-success" : confidence >= 75 ? "bg-warning" : "bg-danger";
+                                                var badgeClass = confidence >= 90 ? "confidence-high" : confidence >= 75 ? "confidence-medium" : "confidence-low";
                                                 <span class="badge @badgeClass">@confidence.ToString("F1")%</span>
                                             }
                                             else

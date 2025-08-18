@@ -2,6 +2,62 @@
     ViewData["Title"] = "Upload Invoice";
 }
 
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="kpi">
+                    <div class="kpi__label">
+                        <i class="fas fa-file-invoice text-brand"></i>
+                        Total Invoices
+                    </div>
+                    <div class="kpi__value text-brand">@ViewBag.TotalInvoices</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="kpi">
+                    <div class="kpi__label">
+                        <i class="fas fa-check-circle text-success"></i>
+                        Approved
+                    </div>
+                    <div class="kpi__value text-success">@ViewBag.ApprovedInvoices</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="kpi">
+                    <div class="kpi__label">
+                        <i class="fas fa-clock text-warning"></i>
+                        Pending
+                    </div>
+                    <div class="kpi__value text-warning">@ViewBag.PendingInvoices</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="kpi">
+                    <div class="kpi__label">
+                        <i class="fas fa-dollar-sign text-success"></i>
+                        Total Value
+                    </div>
+                    <div class="kpi__value text-success">$@ViewBag.TotalValue</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-md-8 mx-auto">
         <div class="card">

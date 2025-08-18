@@ -417,3 +417,9 @@ logs/
 
 # Generated test outputs
 TestInvoices/**/*.html
+
+# Deploy directory (build artifacts) - should not be tracked
+src/deploy/
+
+# Large zip files in root
+deploy.zip

@@ -21,8 +21,31 @@ public class HomeController : Controller
     /// Home page with file upload interface
     /// </summary>
     [HttpGet]
-    public IActionResult Index()
+    public async Task<IActionResult> Index()
     {
+        try
+        {
+            // Get KPI data for dashboard
+            var allInvoices = await _invoiceService.GetInvoicesAsync(1, 1000); // Get all invoices for KPIs
+            var approvedCount = allInvoices.Items.Count(i => i.Approved);
+            var pendingCount = allInvoices.Items.Count(i => !i.Approved);
+            var totalValue = allInvoices.Items.Sum(i => i.TotalCost);
+
+            ViewBag.TotalInvoices = allInvoices.TotalCount;
+            ViewBag.ApprovedInvoices = approvedCount;
+            ViewBag.PendingInvoices = pendingCount;
+            ViewBag.TotalValue = totalValue.ToString("N0");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not load KPI data for dashboard");
+            // Set default values if KPI data fails to load
+            ViewBag.TotalInvoices = "N/A";
+            ViewBag.ApprovedInvoices = "N/A";
+            ViewBag.PendingInvoices = "N/A";
+            ViewBag.TotalValue = "N/A";
+        }
+
         return View();
     }
 
