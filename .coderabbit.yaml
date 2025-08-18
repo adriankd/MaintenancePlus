@@ -1,0 +1,167 @@
+# CodeRabbit Configuration
+# https://docs.coderabbit.ai/guides/review-settings
+
+# Language and framework specific settings
+language: "csharp"
+framework: "aspnet-core"
+
+# Review settings
+reviews:
+  # Enable high-level summary of changes
+  high_level_summary: true
+  
+  # Enable poem-style summaries (optional, can be fun)
+  poem: false
+  
+  # Review focus areas
+  focus:
+    - security
+    - performance
+    - maintainability
+    - best_practices
+    - error_handling
+    - testing
+    - documentation
+
+# Path-based settings
+path_instructions:
+  # Source code - comprehensive review
+  - path: "src/**"
+    instructions: |
+      - Focus on C# best practices and .NET Core conventions
+      - Check for proper error handling and logging
+      - Verify database operations are efficient and secure
+      - Ensure proper async/await usage
+      - Review dependency injection patterns
+      - Check for potential security vulnerabilities
+      - Validate input sanitization for file uploads and form processing
+  
+  # Controllers - API and MVC specific review  
+  - path: "src/Controllers/**"
+    instructions: |
+      - Review controller actions for proper HTTP status codes
+      - Check authorization and authentication implementation
+      - Validate request/response models and data binding
+      - Ensure proper error handling and exception management
+      - Review API documentation completeness
+  
+  # Services - business logic review
+  - path: "src/Services/**"
+    instructions: |
+      - Focus on business logic correctness and efficiency
+      - Check for proper separation of concerns
+      - Review async patterns and database access
+      - Validate error handling and logging
+      - Ensure proper resource disposal
+  
+  # Views and UI - frontend review
+  - path: "src/Views/**"
+    instructions: |
+      - Check for XSS prevention and input validation
+      - Review accessibility compliance
+      - Validate proper use of Razor syntax
+      - Check for consistent UI patterns and styling
+  
+  # CSS and styling
+  - path: "src/wwwroot/css/**"
+    instructions: |
+      - Review CSS organization and maintainability
+      - Check for responsive design patterns
+      - Validate accessibility (color contrast, focus states)
+      - Ensure consistent design system usage
+  
+  # Configuration files
+  - path: "src/appsettings*.json"
+    instructions: |
+      - Ensure no sensitive data is exposed
+      - Validate configuration structure
+      - Check for environment-specific settings
+  
+  # Database migrations
+  - path: "src/Migrations/**"
+    instructions: |
+      - Review migration safety and reversibility
+      - Check for data loss prevention
+      - Validate index and constraint usage
+      - Ensure proper naming conventions
+
+# Files to ignore during review
+ignored_files:
+  - "**/*.min.js"
+  - "**/*.min.css"
+  - "**/bin/**"
+  - "**/obj/**"
+  - "**/*.dll"
+  - "**/*.exe"
+  - "**/packages/**"
+  - "**/node_modules/**"
+  - "**/.vs/**"
+  - "**/TestResults/**"
+  - "**/logs/**"
+  - "**/.git/**"
+  - "**/deploy.zip"
+  - "**/publish/**"
+
+# Auto-approve settings (use cautiously)
+auto_approve:
+  # Auto-approve documentation-only changes
+  - path: "*.md"
+    conditions:
+      - no_code_changes: true
+  
+  # Auto-approve minor configuration changes
+  - path: ".gitignore"
+    conditions:
+      - lines_changed: < 10
+
+# Integration settings
+integrations:
+  # GitHub settings
+  github:
+    # Request reviews on draft PRs
+    review_drafts: false
+    
+    # Automatically resolve conversations when addressed
+    auto_resolve_conversations: true
+    
+    # Add labels based on review results
+    auto_labeling:
+      - label: "needs-review"
+        condition: "review_requested"
+      - label: "security-review"
+        condition: "security_issues_found"
+      - label: "performance-review" 
+        condition: "performance_issues_found"
+
+# Custom rules for the Vehicle Maintenance Invoice System
+custom_rules:
+  # Ensure proper logging for invoice processing
+  - name: "invoice_processing_logging"
+    pattern: "InvoiceProcessingService|FormRecognizerService"
+    message: "Ensure comprehensive logging for invoice processing operations for audit trail"
+  
+  # Check for proper error handling in file upload scenarios
+  - name: "file_upload_validation"
+    pattern: "IFormFile|BlobStorageService"
+    message: "Validate file upload security - check file types, size limits, and sanitization"
+  
+  # Database security checks
+  - name: "sql_injection_prevention"
+    pattern: "SqlCommand|ExecuteSqlRaw"
+    message: "Ensure parameterized queries are used to prevent SQL injection"
+  
+  # OCR and AI service error handling
+  - name: "external_service_resilience"
+    pattern: "FormRecognizerClient|Azure\.AI"
+    message: "Check for proper retry policies and error handling for external AI services"
+
+# Notification settings
+notifications:
+  # Notify on security issues
+  security_issues: true
+  
+  # Notify on performance issues
+  performance_issues: true
+  
+  # Summary notifications
+  review_summary: true
