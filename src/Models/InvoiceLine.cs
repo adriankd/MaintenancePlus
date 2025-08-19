@@ -46,15 +46,49 @@ public class InvoiceLine
     public string? Category { get; set; }
 
     /// <summary>
+    /// ML-classified category: Part, Labor (result of intelligent classification)
+    /// </summary>
+    [Required]
+    [StringLength(50)]
+    public string ClassifiedCategory { get; set; } = "Unclassified";
+
+    /// <summary>
+    /// Confidence score for ML classification (0-100)
+    /// </summary>
+    [Column(TypeName = "decimal(5,2)")]
+    public decimal? ClassificationConfidence { get; set; }
+
+    /// <summary>
+    /// Method used for classification (Rule-based, ML.NET, Azure-AI, Manual)
+    /// </summary>
+    [Required]
+    [StringLength(50)]
+    public string ClassificationMethod { get; set; } = "Rule-based";
+
+    /// <summary>
+    /// Version of classification model/rules used
+    /// </summary>
+    [StringLength(20)]
+    public string? ClassificationVersion { get; set; }
+
+    /// <summary>
+    /// Original extracted category before intelligent classification
+    /// </summary>
+    [StringLength(100)]
+    public string? OriginalCategory { get; set; }
+
+    /// <summary>
     /// Line-level confidence score (0-100) for OCR extraction
     /// </summary>
     [Column(TypeName = "decimal(5,2)")]
-    public decimal? ConfidenceScore { get; set; }
+    public decimal? ExtractionConfidence { get; set; }
 
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-    // Navigation property
+    // Navigation properties
     [ForeignKey("InvoiceID")]
     public virtual InvoiceHeader InvoiceHeader { get; set; } = null!;
+    
+    public virtual ICollection<ClassificationFeedback> ClassificationFeedbacks { get; set; } = new List<ClassificationFeedback>();
 }

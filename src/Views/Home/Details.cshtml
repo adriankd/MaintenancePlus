@@ -175,13 +175,13 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th width="5%">#</th>
-                                        <th width="35%">Description</th>
-                                        <th width="10%">Category</th>
+                                        <th width="30%">Description</th>
+                                        <th width="12%">Category</th>
                                         <th width="10%">Unit Cost</th>
                                         <th width="8%">Qty</th>
                                         <th width="12%">Line Total</th>
                                         <th width="10%">Part Number</th>
-                                        <th width="10%">Confidence</th>
+                                        <th width="13%">Confidence</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -195,10 +195,12 @@
                                                 {
                                                     var categoryClass = line.Category switch 
                                                     {
+                                                        "Part" => "bg-primary",
                                                         "Parts" => "bg-primary",
                                                         "Labor" => "bg-warning text-dark",
                                                         "Tax" => "bg-info",
                                                         "Fee" => "bg-secondary",
+                                                        "Unclassified" => "bg-danger",
                                                         _ => "bg-light text-dark"
                                                     };
                                                     <span class="badge @categoryClass">@line.Category</span>
@@ -218,11 +220,25 @@
                                                 }
                                             </td>
                                             <td>
-                                                @if (line.ConfidenceScore.HasValue)
+                                                @if (line.ClassificationConfidence.HasValue)
+                                                {
+                                                    var classConfidence = line.ClassificationConfidence.Value;
+                                                    var classBadgeClass = classConfidence >= 90 ? "bg-success" : classConfidence >= 75 ? "bg-warning" : "bg-danger";
+                                                    <div>
+                                                        <span class="badge @classBadgeClass">@classConfidence.ToString("F0")%</span>
+                                                        <br />
+                                                        <small class="text-muted">Classification</small>
+                                                    </div>
+                                                }
+                                                else if (line.ConfidenceScore.HasValue)
                                                 {
                                                     var lineConfidence = line.ConfidenceScore.Value;
                                                     var lineBadgeClass = lineConfidence >= 90 ? "bg-success" : lineConfidence >= 75 ? "bg-warning" : "bg-danger";
-                                                    <span class="badge @lineBadgeClass">@lineConfidence.ToString("F0")%</span>
+                                                    <div>
+                                                        <span class="badge @lineBadgeClass">@lineConfidence.ToString("F0")%</span>
+                                                        <br />
+                                                        <small class="text-muted">Extraction</small>
+                                                    </div>
                                                 }
                                                 else
                                                 {
@@ -249,7 +265,7 @@
                                     <div class="card-body">
                                         <i class="fas fa-cogs fa-2x text-primary mb-2"></i>
                                         <h6>Parts</h6>
-                                        <h5 class="text-primary">$@Model.LineItems.Where(l => l.Category == "Parts").Sum(l => l.TotalLineCost).ToString("N2")</h5>
+                                        <h5 class="text-primary">$@Model.LineItems.Where(l => l.Category == "Part" || l.Category == "Parts").Sum(l => l.TotalLineCost).ToString("N2")</h5>
                                     </div>
                                 </div>
                             </div>

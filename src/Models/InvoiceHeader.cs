@@ -71,6 +71,31 @@ public class InvoiceHeader
     [StringLength(100)]
     public string? ApprovedBy { get; set; }
 
-    // Navigation property
+    /// <summary>
+    /// Original extracted vehicle field label before normalization
+    /// </summary>
+    [StringLength(100)]
+    public string? OriginalVehicleLabel { get; set; }
+
+    /// <summary>
+    /// Original extracted odometer field label before normalization
+    /// </summary>
+    [StringLength(100)]
+    public string? OriginalOdometerLabel { get; set; }
+
+    /// <summary>
+    /// Original extracted invoice field label before normalization
+    /// </summary>
+    [StringLength(100)]
+    public string? OriginalInvoiceLabel { get; set; }
+
+    /// <summary>
+    /// Version of field normalization rules applied
+    /// </summary>
+    [StringLength(20)]
+    public string? NormalizationVersion { get; set; }
+
+    // Navigation properties
     public virtual ICollection<InvoiceLine> InvoiceLines { get; set; } = new List<InvoiceLine>();
+    public virtual ICollection<FieldNormalizationFeedback> FieldNormalizationFeedbacks { get; set; } = new List<FieldNormalizationFeedback>();
 }
