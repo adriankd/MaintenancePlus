@@ -296,7 +296,25 @@ public class FormRecognizerService : IFormRecognizerService
                 var text = line.Content.ToLowerInvariant();
                 if (odometerKeywords.Any(keyword => text.Contains(keyword)))
                 {
-                    // Try to extract number from the line
+                    // Try to extract number from the line - handle comma-separated numbers
+                    // First try to extract numbers with commas (e.g., 67,890)
+                    var commaNumbers = System.Text.RegularExpressions.Regex.Matches(text, @"\d{1,3}(?:,\d{3})+")
+                        .Cast<System.Text.RegularExpressions.Match>()
+                        .Select(m => m.Value)
+                        .ToList();
+
+                    if (commaNumbers.Any())
+                    {
+                        var numberString = commaNumbers.First().Replace(",", "");
+                        if (int.TryParse(numberString, out var odometerWithComma))
+                        {
+                            invoiceData.Odometer = odometerWithComma;
+                            // Note: Confidence score for odometer extraction from text is not available
+                            break;
+                        }
+                    }
+
+                    // Fallback to regular numbers without commas (at least 3 digits)
                     var numbers = System.Text.RegularExpressions.Regex.Matches(text, @"\d+")
                         .Cast<System.Text.RegularExpressions.Match>()
                         .Select(m => m.Value)
