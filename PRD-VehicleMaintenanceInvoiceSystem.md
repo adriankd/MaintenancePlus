@@ -520,7 +520,6 @@ Stores one record per invoice with summary information extracted from invoice he
 | OriginalVehicleLabel | NVARCHAR(100) | NULL | Original extracted vehicle field label |
 | Odometer | INT | NULL | Mileage reading from invoice (supports comma-separated format) |
 | OriginalOdometerLabel | NVARCHAR(100) | NULL | Original extracted odometer field label |
-| OriginalOdometerText | NVARCHAR(50) | NULL | Original extracted odometer text (e.g., "67,890") |
 | InvoiceNumber | NVARCHAR(50) | NOT NULL, UNIQUE | Invoice number from header (normalized) |
 | OriginalInvoiceLabel | NVARCHAR(100) | NULL | Original extracted invoice field label |
 | InvoiceDate | DATE | NOT NULL | Service/invoice date |
@@ -534,7 +533,6 @@ Stores one record per invoice with summary information extracted from invoice he
 | ExtractedData | NVARCHAR(MAX) | NULL | Raw JSON of extracted data |
 | ConfidenceScore | DECIMAL(5,2) | NULL | Overall extraction confidence |
 | NormalizationVersion | NVARCHAR(20) | NULL | Version of normalization rules applied |
-| NumericParsingVersion | NVARCHAR(20) | NULL | Version of numeric parsing logic applied |
 | CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time (UTC) |
 
 ### InvoiceLines Table
