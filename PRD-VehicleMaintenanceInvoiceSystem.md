@@ -108,35 +108,60 @@ The system processes vehicle maintenance invoices through the following workflow
   - Flag incomplete extractions for manual review
 
 #### FR-005: Part Number Extraction and Storage
-- **Description**: Extract part numbers from parts-only invoice line items and store them in the database for inventory and procurement tracking
+- **Description**: Extract part numbers from parts-only invoice line items using table-first approach with intelligent fallback methods for comprehensive part number capture
 - **Acceptance Criteria**:
   - **Line Item Type Filtering**:
     - Only attempt part number extraction for line items classified as "Parts" 
     - Do not extract part numbers from Labor, Tax, Fee, or Service line items
     - Apply part number extraction after line item classification is complete
-  - **Extraction Source Limitations**:
-    - Extract part numbers ONLY from dedicated part number columns in invoice tables
-    - Do not attempt to parse or extract part numbers from item descriptions
-    - Do not use regex pattern matching on description text
-    - Only use explicitly labeled part number fields (e.g., "Part Number", "Part No", "PN", "Item Number")
+  - **Extraction Methodology (Table-First with Fallbacks)**:
+    - **Primary Method**: Extract from dedicated part number columns in invoice table structures
+      - Smart column detection for various naming conventions ("Part Number", "Part No", "PN", "P/N", "Part#", "Item Number")
+      - Use case-insensitive header matching with keyword detection
+      - Match part numbers to line items using description correlation
+    - **Fallback Methods** (when table columns unavailable or insufficient):
+      - Description-based matching using fuzzy string comparison algorithms
+      - Regex pattern matching for common part number formats (alphanumeric with hyphens, manufacturer codes)
+      - Format validation using `IsLikelyPartNumber` heuristics
+    - **Intelligent Processing**:
+      - Prioritize table-extracted part numbers over description-parsed ones
+      - Cross-validate part numbers against line item descriptions for accuracy
+      - Handle multiple table structures and vendor-specific invoice formats
   - **Data Processing Requirements**:
     - Store extracted part numbers in the `PartNumber` column of `InvoiceLines` table
     - Preserve original format and casing of part numbers exactly as found
-    - Handle missing part number columns gracefully (store as NULL)
+    - Handle missing part number data gracefully (store as NULL)
     - Store empty/blank part number fields as NULL (not empty string)
+    - Log extraction method used (table column, description parsing, regex) for audit purposes
   - **Quality and Validation**:
     - Achieve 95% accuracy in part number extraction from dedicated columns when present
-    - Only extract data from clearly identified part number table columns
-    - Flag invoices without part number columns for manual review if needed
-    - Maintain audit trail showing which column was used for part number extraction
+    - Achieve 85% accuracy in part number extraction using fallback methods
+    - **Format Validation**: Use `IsLikelyPartNumber` heuristics to validate extracted part numbers
+      - Verify alphanumeric patterns with manufacturer-specific formatting (e.g., Honda: 17220-5AA-A00, Ford: BC3Z-7G391-A)
+      - Check for common part number characteristics (length, hyphen placement, character patterns)
+      - Reject obvious false positives (generic text, pure numbers without formatting)
+    - **Extraction Path Logging**: Log the specific extraction method used for audit and debugging
+      - Record source: "table-column", "description-parsing", or "regex-fallback"
+      - Log source column name when extracted from table structures
+      - Track confidence scores for each extraction method
+      - Enable traceability for quality improvement and troubleshooting
+    - Flag invoices with low extraction confidence for manual review
+    - Maintain comprehensive audit trail showing extraction method and source column/field used
 
 #### FR-006: Data Mapping and Transformation
 - **Description**: Transform extracted invoice data into normalized database structure
 - **Acceptance Criteria**:
   - Map header fields to InvoiceHeader table columns
   - Map all line items to InvoiceLines table with proper categorization
-  - **Extract and store part numbers from dedicated part number columns for Parts-only line items**
-  - **Only extract part numbers from clearly labeled part number table columns, not descriptions**
+  - **Part Number Extraction Policy (Table-First with Fallbacks)**:
+    - **Primary**: Extract part numbers from clearly labeled part number table columns when available
+    - **Fallback**: Allow description-based extraction when no dedicated column exists, provided:
+      - Strict validation using `IsLikelyPartNumber` confidence thresholds (minimum 85% confidence)
+      - Complete provenance recording (source method, confidence score, extraction path)
+      - Automatic flagging for manual review when confidence falls below threshold
+      - Logging and metrics collection for all fallback extractions
+    - **Restrictions**: Populate `PartNumber` field only for line items classified as "Parts"
+    - **Null Handling**: Set `PartNumber` to NULL when no dedicated column exists for non-Parts items or when extraction confidence is insufficient
   - Calculate and validate totals (parts vs labor vs total cost)
   - Assign sequential line numbers to detail items
   - Classify line items by type (Parts, Labor, Tax, Fees, Services)

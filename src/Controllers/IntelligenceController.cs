@@ -122,7 +122,15 @@ public class IntelligenceController : ControllerBase
                 lineItem.ClassificationMethod = "User Correction";
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error when recording classification feedback for line {LineId}", lineId);
+                return Conflict(new { error = "Database constraint violation", details = "Unable to save feedback due to database conflict" });
+            }
 
             // Record in intelligence service for potential retraining
             await _intelligenceService.RecordClassificationFeedbackAsync(lineId, request.CorrectCategory, request.UserId ?? "anonymous");
@@ -224,7 +232,15 @@ public class IntelligenceController : ControllerBase
                 }
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error when recording normalization feedback for invoice {InvoiceId}", invoiceId);
+                return Conflict(new { error = "Database constraint violation", details = "Unable to save normalization feedback due to database conflict" });
+            }
 
             // Record in intelligence service for potential retraining
             await _intelligenceService.RecordNormalizationFeedbackAsync(invoiceId, request.FieldName, request.ExpectedValue, request.UserId ?? "anonymous");
@@ -317,7 +333,15 @@ public class IntelligenceController : ControllerBase
             }
         }
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database error when applying intelligence classification for invoice {InvoiceId}", invoice.InvoiceID);
+            throw new InvalidOperationException("Unable to apply intelligence classification due to database conflict", ex);
+        }
     }
 }
 

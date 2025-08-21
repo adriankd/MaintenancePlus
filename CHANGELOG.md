@@ -8,18 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Phase 2 Intelligence System implementation
-- Rule-based line item classification (Part vs Labor)
-- Field label normalization with dictionary-based lookup
-- User feedback collection for classification corrections
-- Invoice approval/rejection workflow
-- Intelligence processing API endpoints
-- Classification accuracy monitoring
+- **Part Number Extraction from Invoice Tables**: Enhanced FormRecognizerService to extract part numbers from table structures when not available in Items field
+  - Smart column detection for various part number naming conventions (part number, p/n, part#, etc.)
+  - Description-based matching algorithm to link part numbers with corresponding line items
+  - Support for Honda, Ford, and other vendor-specific invoice formats
+- **Debug Endpoint for Extraction Inspection**: New API endpoint `/api/invoices/{id}/debug` for inspecting raw extracted data
+  - Enables troubleshooting of OCR extraction issues
+  - Provides detailed view of Form Recognizer response structure
+  - Supports development and testing workflows
+
+### Enhanced
+- **Table Processing Integration**: Supplemental part number extraction integrated into prebuilt invoice processing flow
+  - Preserves existing Items field processing while adding table-based enhancement
+  - Comprehensive logging for part number extraction debugging
+  - Fuzzy string matching for improved description correlation
 
 ### Changed
-- Enhanced database schema with intelligence tracking tables
-- Updated UI to display classification results with confidence scores
-- Improved invoice details page with approval controls
+- **Database Foreign Key Constraints**: Migration `FixCascadeDeletePaths` changes FK delete behavior from CASCADE to RESTRICT
+  - ClassificationFeedback → InvoiceHeader relationship now uses `ReferentialAction.Restrict`
+  - Prevents cascade delete conflicts and multiple cascade paths in database schema
+  - **Breaking Change**: Invoice deletions will now fail if ClassificationFeedback records exist - must be manually deleted first
+  - Improves data integrity by requiring explicit feedback cleanup before invoice deletion
+
+### Fixed
+- **Cascade Delete Path Handling**: Updated database context to preserve nested field resolution during processing
+  - Maintains referential integrity during invoice deletion operations
+  - Ensures proper cleanup of related line items and metadata
+
+## [2.0.1] - 2025-08-21
 
 ### Fixed
 - **Odometer/Mileage Parsing**: Fixed extraction of comma-separated mileage readings (e.g., `67,890 miles`)

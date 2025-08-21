@@ -52,7 +52,7 @@ public class InvoiceHeader
     public decimal? ConfidenceScore { get; set; }
 
     [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; }
 
     /// <summary>
     /// Indicates whether this invoice has been approved for payment
