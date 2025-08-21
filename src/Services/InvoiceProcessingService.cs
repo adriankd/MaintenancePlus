@@ -28,17 +28,20 @@ public class InvoiceProcessingService : IInvoiceProcessingService
     private readonly InvoiceDbContext _context;
     private readonly IBlobStorageService _blobStorageService;
     private readonly IFormRecognizerService _formRecognizerService;
+    private readonly IInvoiceIntelligenceService _intelligenceService;
     private readonly ILogger<InvoiceProcessingService> _logger;
 
     public InvoiceProcessingService(
         InvoiceDbContext context,
         IBlobStorageService blobStorageService,
         IFormRecognizerService formRecognizerService,
+        IInvoiceIntelligenceService intelligenceService,
         ILogger<InvoiceProcessingService> logger)
     {
         _context = context;
         _blobStorageService = blobStorageService;
         _formRecognizerService = formRecognizerService;
+        _intelligenceService = intelligenceService;
         _logger = logger;
     }
 
@@ -114,6 +117,64 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
                 _logger.LogInformation("Invoice {InvoiceNumber} saved successfully with ID: {InvoiceId}", 
                     invoiceHeader.InvoiceNumber, invoiceHeader.InvoiceID);
+
+                // Phase 2: Apply intelligence processing automatically
+                try
+                {
+                    _logger.LogInformation("Starting automatic intelligence processing for Invoice ID: {InvoiceId}", invoiceHeader.InvoiceID);
+                    
+                    // Reload invoice with line items for intelligence processing
+                    var invoiceWithLines = await _context.InvoiceHeaders
+                        .Include(i => i.InvoiceLines)
+                        .FirstOrDefaultAsync(i => i.InvoiceID == invoiceHeader.InvoiceID);
+                        
+                    if (invoiceWithLines != null)
+                    {
+                        var intelligenceResult = await _intelligenceService.ProcessInvoiceAsync(invoiceWithLines);
+                        
+                        if (intelligenceResult.Success)
+                        {
+                            // Apply classification results to line items
+                            foreach (var classification in intelligenceResult.LineClassifications)
+                            {
+                                var line = invoiceWithLines.InvoiceLines?.FirstOrDefault(l => l.LineID == classification.LineId);
+                                if (line != null)
+                                {
+                                    line.ClassifiedCategory = classification.ClassifiedCategory;
+                                    line.ClassificationConfidence = classification.Confidence;
+                                    line.ClassificationMethod = classification.Method;
+                                    line.ClassificationVersion = classification.Version;
+                                }
+                            }
+
+                            // Apply normalization results to header
+                            if (intelligenceResult.FieldNormalizations.Any())
+                            {
+                                invoiceWithLines.NormalizationVersion = intelligenceResult.FieldNormalizations.First().Version;
+                            }
+
+                            // Save intelligence results to database
+                            await _context.SaveChangesAsync();
+                            
+                            _logger.LogInformation("Intelligence processing completed successfully for Invoice ID: {InvoiceId}. Classifications: {ClassificationCount}, Normalizations: {NormalizationCount}", 
+                                invoiceHeader.InvoiceID, intelligenceResult.LineClassifications.Count, intelligenceResult.FieldNormalizations.Count);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Intelligence processing failed for Invoice ID: {InvoiceId}: {Errors}", 
+                                invoiceHeader.InvoiceID, string.Join(", ", intelligenceResult.Errors));
+                            foreach (var warning in intelligenceResult.Warnings)
+                            {
+                                response.Warnings.Add($"Intelligence processing warning: {warning}");
+                            }
+                        }
+                    }
+                }
+                catch (Exception intelligenceEx)
+                {
+                    _logger.LogError(intelligenceEx, "Intelligence processing error for Invoice ID: {InvoiceId}", invoiceHeader.InvoiceID);
+                    response.Warnings.Add($"Intelligence processing failed: {intelligenceEx.Message}");
+                }
 
                 response.Success = true;
                 response.Message = "Invoice processed successfully";
@@ -241,8 +302,10 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                         Quantity = l.Quantity,
                         TotalLineCost = l.TotalLineCost,
                         PartNumber = l.PartNumber,
-                        Category = l.Category,
-                        ConfidenceScore = l.ConfidenceScore
+                        Category = l.ClassifiedCategory ?? l.Category,
+                        ClassifiedCategory = l.ClassifiedCategory,
+                        ClassificationConfidence = l.ClassificationConfidence,
+                        ConfidenceScore = l.ExtractionConfidence
                     };
                 })
                 .ToList() ?? new List<InvoiceLineDto>();
@@ -645,7 +708,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             TotalLineCost = data.TotalCost,
             PartNumber = data.PartNumber,
             Category = data.Category,
-            ConfidenceScore = data.ConfidenceScore,
+            ExtractionConfidence = data.ConfidenceScore,
             CreatedAt = DateTime.Now
         };
     }

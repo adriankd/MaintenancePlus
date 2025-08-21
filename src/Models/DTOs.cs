@@ -126,6 +126,8 @@ public class InvoiceLineDto
     public decimal TotalLineCost { get; set; }
     public string? PartNumber { get; set; }
     public string? Category { get; set; }
+    public string? ClassifiedCategory { get; set; }
+    public decimal? ClassificationConfidence { get; set; }
     public decimal? ConfidenceScore { get; set; }
 }
 

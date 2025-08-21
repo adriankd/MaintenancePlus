@@ -34,6 +34,11 @@ builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<IFormRecognizerService, FormRecognizerService>();
 builder.Services.AddScoped<IInvoiceProcessingService, InvoiceProcessingService>();
 
+// Register Phase 2 Intelligence Services
+builder.Services.AddScoped<ILineItemClassifier, RuleBasedLineItemClassifier>();
+builder.Services.AddScoped<IFieldNormalizer, DictionaryBasedFieldNormalizer>();
+builder.Services.AddScoped<IInvoiceIntelligenceService, RuleBasedInvoiceIntelligenceService>();
+
 // Add API documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
