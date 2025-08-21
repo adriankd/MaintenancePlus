@@ -3,6 +3,7 @@ using VehicleMaintenanceInvoiceSystem.Services;
 using VehicleMaintenanceInvoiceSystem.Data;
 using VehicleMaintenanceInvoiceSystem.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace VehicleMaintenanceInvoiceSystem.Controllers;
 
@@ -122,7 +123,15 @@ public class IntelligenceController : ControllerBase
                 lineItem.ClassificationMethod = "User Correction";
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error when recording classification feedback for line {LineId}", lineId);
+                return Conflict(new { error = "Database constraint violation", details = "Unable to save feedback due to database conflict" });
+            }
 
             // Record in intelligence service for potential retraining
             await _intelligenceService.RecordClassificationFeedbackAsync(lineId, request.CorrectCategory, request.UserId ?? "anonymous");
@@ -186,22 +195,58 @@ public class IntelligenceController : ControllerBase
                 switch (request.FieldName.ToLower())
                 {
                     case "vehiclelabel":
-                        // Update with corrected normalization
+                        // Apply the user-corrected value to the actual VehicleID field
+                        invoice.VehicleID = request.ExpectedValue;
                         invoice.NormalizationVersion = "User Corrected";
                         break;
                     case "odometerlabel":
-                        invoice.NormalizationVersion = "User Corrected";
+                        // Apply the user-corrected value to the actual Odometer field
+                        // Support comma-separated numbers and whitespace (e.g., "67,890", " 123,456 ")
+                        var trimmedOdometer = request.ExpectedValue?.Trim();
+                        if (int.TryParse(trimmedOdometer, NumberStyles.AllowThousands | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.InvariantCulture, out var odometerValue))
+                        {
+                            invoice.Odometer = odometerValue;
+                            invoice.NormalizationVersion = "User Corrected";
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Invalid odometer value provided: {Value}", request.ExpectedValue);
+                        }
                         break;
                     case "invoicelabel":
+                        // Apply the user-corrected value to the actual InvoiceNumber field
+                        // First check if the new invoice number already exists
+                        var existingInvoice = await _context.InvoiceHeaders
+                            .Where(i => i.InvoiceNumber == request.ExpectedValue && i.InvoiceID != invoiceId)
+                            .FirstOrDefaultAsync();
+                        
+                        if (existingInvoice != null)
+                        {
+                            return BadRequest(new 
+                            { 
+                                success = false, 
+                                message = $"Invoice number '{request.ExpectedValue}' already exists. Please choose a different number or resolve the conflict." 
+                            });
+                        }
+                        
+                        invoice.InvoiceNumber = request.ExpectedValue;
                         invoice.NormalizationVersion = "User Corrected";
                         break;
                 }
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex, "Database error when recording normalization feedback for invoice {InvoiceId}", invoiceId);
+                return Conflict(new { error = "Database constraint violation", details = "Unable to save normalization feedback due to database conflict" });
+            }
 
             // Record in intelligence service for potential retraining
-            await _intelligenceService.RecordNormalizationFeedbackAsync(invoiceId, request.FieldName, request.ExpectedValue, request.UserId ?? "anonymous");
+            await _intelligenceService.RecordNormalizationFeedbackAsync(invoiceId, request.FieldName, request.ExpectedValue ?? "", request.UserId ?? "anonymous");
 
             _logger.LogInformation("Normalization feedback recorded for invoice {InvoiceId}, field {FieldName}: {OriginalValue} → {ExpectedValue}",
                 invoiceId, request.FieldName, request.OriginalValue, request.ExpectedValue);
@@ -244,12 +289,17 @@ public class IntelligenceController : ControllerBase
                 })
                 .ToListAsync();
 
-            var overall = feedbacks.Any() ? new
+            object? overall = null;
+            if (feedbacks.Any())
             {
-                TotalFeedbacks = feedbacks.Sum(f => f.TotalFeedbacks),
-                OverallAccuracy = feedbacks.Sum(f => f.CorrectPredictions) / (double)feedbacks.Sum(f => f.TotalFeedbacks) * 100,
-                AverageConfidence = feedbacks.Average(f => f.AverageConfidence)
-            } : null;
+                var total = feedbacks.Sum(f => f.TotalFeedbacks);
+                overall = new
+                {
+                    TotalFeedbacks = total,
+                    OverallAccuracy = total == 0 ? 0.0 : feedbacks.Sum(f => f.CorrectPredictions) / (double)total * 100,
+                    AverageConfidence = feedbacks.Average(f => f.AverageConfidence)
+                };
+            }
 
             return Ok(new
             {
@@ -286,7 +336,15 @@ public class IntelligenceController : ControllerBase
             }
         }
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Database error when applying intelligence classification for invoice {InvoiceId}", invoice.InvoiceID);
+            throw new InvalidOperationException("Unable to apply intelligence classification due to database conflict", ex);
+        }
     }
 }
 

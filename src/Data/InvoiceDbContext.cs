@@ -46,7 +46,7 @@ public class InvoiceDbContext : DbContext
             entity.HasCheckConstraint("CK_InvoiceHeader_ConfidenceScore", "ConfidenceScore IS NULL OR (ConfidenceScore >= 0 AND ConfidenceScore <= 100)");
 
             // Default values
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
         // Configure InvoiceLine
@@ -81,7 +81,7 @@ public class InvoiceDbContext : DbContext
                   .OnDelete(DeleteBehavior.Cascade);
 
             // Default values
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
 
         // Configure ClassificationFeedback
@@ -94,13 +94,19 @@ public class InvoiceDbContext : DbContext
             entity.HasIndex(e => e.UserID).HasDatabaseName("IX_ClassificationFeedback_UserID");
 
             entity.Property(e => e.OriginalConfidence).HasColumnType("decimal(5,2)");
-            entity.Property(e => e.FeedbackDate).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.FeedbackDate).HasDefaultValueSql("GETUTCDATE()");
 
-            // Foreign key relationship
+            // Foreign key relationships
             entity.HasOne(e => e.InvoiceLine)
                   .WithMany(e => e.ClassificationFeedbacks)
                   .HasForeignKey(e => e.LineID)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure InvoiceHeader relationship with Restrict to avoid multiple cascade paths
+            entity.HasOne(e => e.InvoiceHeader)
+                  .WithMany()
+                  .HasForeignKey(e => e.InvoiceID)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Configure FieldNormalizationFeedback  
@@ -113,7 +119,7 @@ public class InvoiceDbContext : DbContext
             entity.HasIndex(e => e.FeedbackDate).HasDatabaseName("IX_FieldNormalizationFeedback_FeedbackDate");
             entity.HasIndex(e => e.UserID).HasDatabaseName("IX_FieldNormalizationFeedback_UserID");
 
-            entity.Property(e => e.FeedbackDate).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.FeedbackDate).HasDefaultValueSql("GETUTCDATE()");
 
             // Foreign key relationship
             entity.HasOne(e => e.InvoiceHeader)
@@ -133,7 +139,7 @@ public class InvoiceDbContext : DbContext
 
             entity.Property(e => e.AccuracyPercentage).HasColumnType("decimal(5,2)");
             entity.Property(e => e.AverageConfidence).HasColumnType("decimal(5,2)");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
         });
     }
 }

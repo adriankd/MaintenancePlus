@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 
 // Simple test program for Phase 2 Intelligence Features
 Console.WriteLine("=== Phase 2 Intelligence Features Test ===\n");

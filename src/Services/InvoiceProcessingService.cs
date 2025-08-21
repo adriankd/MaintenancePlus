@@ -18,6 +18,7 @@ public interface IInvoiceProcessingService
     Task<string> GetSecureFileUrlAsync(int invoiceId, string? userIdentifier = null);
     Task<InvoiceActionResponse> ApproveInvoiceAsync(int invoiceId, string approvedBy);
     Task<InvoiceActionResponse> RejectInvoiceAsync(int invoiceId);
+    Task<object?> GetRawExtractedDataAsync(int invoiceId);
 }
 
 /// <summary>
@@ -74,6 +75,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
             if (!ocrResult.Success || ocrResult.InvoiceData == null)
             {
+                // Clean up uploaded blob since OCR processing failed
+                await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "OCR failure");
+                
                 response.Success = false;
                 response.Message = "OCR processing failed";
                 response.Errors.Add($"Form Recognizer error: {ocrResult.ErrorMessage}");
@@ -86,6 +90,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             var validationResult = ValidateInvoiceData(ocrResult.InvoiceData);
             if (!validationResult.IsValid)
             {
+                // Clean up uploaded blob since data validation failed
+                await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "validation failure");
+                
                 response.Success = false;
                 response.Message = "Data validation failed";
                 response.Errors.AddRange(validationResult.Errors);
@@ -103,7 +110,45 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             {
                 var invoiceHeader = CreateInvoiceHeader(ocrResult.InvoiceData, uploadResult.BlobUrl!, ocrResult.OverallConfidence, ocrResult.RawJson);
                 _context.InvoiceHeaders.Add(invoiceHeader);
-                await _context.SaveChangesAsync();
+                
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateException ex)
+                {
+                    // Handle unique constraint violations and other database errors
+                    await transaction.RollbackAsync();
+                    
+                    var innerMessage = ex.InnerException?.Message ?? ex.Message;
+                    
+                    if (innerMessage.Contains("IX_InvoiceHeader_InvoiceNumber") || 
+                        innerMessage.Contains("duplicate") && innerMessage.Contains("InvoiceNumber"))
+                    {
+                        // Race condition: another request created an invoice with the same number
+                        // Clean up the uploaded blob file to prevent storage leak
+                        await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "duplicate invoice detection");
+                        
+                        response.Success = false;
+                        response.Message = $"Invoice number '{invoiceHeader.InvoiceNumber}' already exists";
+                        response.Errors.Add($"Duplicate invoice number detected: {invoiceHeader.InvoiceNumber}");
+                        _logger.LogWarning("Duplicate invoice number conflict for {InvoiceNumber}: {Error}", 
+                            invoiceHeader.InvoiceNumber, innerMessage);
+                        return response;
+                    }
+                    else
+                    {
+                        // Other database constraint violations - clean up blob before rethrowing
+                        await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "database constraint violation");
+                        
+                        response.Success = false;
+                        response.Message = "Database constraint violation occurred";
+                        response.Errors.Add($"Database error: {ex.Message}");
+                        _logger.LogError(ex, "Database constraint violation when saving invoice {InvoiceNumber}", 
+                            invoiceHeader.InvoiceNumber);
+                        throw; // Re-throw for other types of database errors
+                    }
+                }
 
                 // Add line items
                 foreach (var lineData in ocrResult.InvoiceData.LineItems)
@@ -302,7 +347,8 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                         Quantity = l.Quantity,
                         TotalLineCost = l.TotalLineCost,
                         PartNumber = l.PartNumber,
-                        Category = l.ClassifiedCategory ?? l.Category,
+                        Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : 
+                                 (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
                         ClassifiedCategory = l.ClassifiedCategory,
                         ClassificationConfidence = l.ClassificationConfidence,
                         ConfidenceScore = l.ExtractionConfidence
@@ -501,7 +547,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
             // Approve the invoice
             invoice.Approved = true;
-            invoice.ApprovedAt = DateTime.Now;
+            invoice.ApprovedAt = DateTime.UtcNow;
             invoice.ApprovedBy = approvedBy;
 
             await _context.SaveChangesAsync();
@@ -597,7 +643,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
                 response.Success = true;
                 response.Message = $"Invoice {invoiceNumber} has been rejected and permanently deleted.";
-                response.ActionTimestamp = DateTime.Now;
+                response.ActionTimestamp = DateTime.UtcNow;
 
                 _logger.LogInformation("Invoice {InvoiceId} rejected and deleted successfully", invoiceId);
 
@@ -627,14 +673,14 @@ public class InvoiceProcessingService : IInvoiceProcessingService
         if (string.IsNullOrWhiteSpace(data.VehicleId))
         {
             // For testing purposes, generate a default Vehicle ID if not extracted
-            data.VehicleId = $"VEH-{DateTime.Now:yyyyMMdd}-{new Random().Next(1000, 9999)}";
+            data.VehicleId = $"VEH-{DateTime.UtcNow:yyyyMMdd}-{new Random().Next(1000, 9999)}";
             result.Warnings.Add($"Vehicle ID not found in document, generated default: {data.VehicleId}");
         }
 
         if (string.IsNullOrWhiteSpace(data.InvoiceNumber))
         {
             // Generate a default invoice number if not extracted
-            data.InvoiceNumber = $"INV-{DateTime.Now:yyyyMMddHHmmss}";
+            data.InvoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMddHHmmss}";
             result.Warnings.Add($"Invoice Number not found in document, generated default: {data.InvoiceNumber}");
         }
 
@@ -649,7 +695,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             result.Errors.Add("Total Cost must be greater than 0");
 
         // Business rule validation
-        if (data.InvoiceDate.HasValue && data.InvoiceDate > DateTime.Now.AddDays(1))
+        if (data.InvoiceDate.HasValue && data.InvoiceDate > DateTime.UtcNow.AddDays(1))
             result.Warnings.Add("Invoice date is in the future");
 
         if (data.Odometer.HasValue && data.Odometer < 0)
@@ -691,8 +737,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             TotalLaborCost = data.TotalLaborCost ?? 0,
             BlobFileUrl = blobUrl,
             ExtractedData = rawJson,
-            ConfidenceScore = confidence,
-            CreatedAt = DateTime.Now
+            ConfidenceScore = confidence
         };
     }
 
@@ -708,9 +753,59 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             TotalLineCost = data.TotalCost,
             PartNumber = data.PartNumber,
             Category = data.Category,
-            ExtractionConfidence = data.ConfidenceScore,
-            CreatedAt = DateTime.Now
+            ExtractionConfidence = data.ConfidenceScore
         };
+    }
+
+    public async Task<object?> GetRawExtractedDataAsync(int invoiceId)
+    {
+        try
+        {
+            var invoice = await _context.InvoiceHeaders
+                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+
+            if (invoice?.ExtractedData == null)
+            {
+                return null;
+            }
+
+            // Parse and return the raw JSON data
+            return JsonSerializer.Deserialize<object>(invoice.ExtractedData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving raw data for invoice {InvoiceId}", invoiceId);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Helper method to clean up uploaded blob file in case of processing failure
+    /// </summary>
+    private async Task CleanupBlobFileAsync(string blobUrl, string reason)
+    {
+        if (string.IsNullOrEmpty(blobUrl))
+            return;
+
+        try
+        {
+            var uri = new Uri(blobUrl);
+            var blobFileName = uri.Segments.Last();
+            
+            var deletionSuccess = await _blobStorageService.DeleteFileAsync(blobFileName);
+            if (deletionSuccess)
+            {
+                _logger.LogInformation("Successfully cleaned up blob file after {Reason}: {BlobFileName}", reason, blobFileName);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to delete blob file after {Reason}: {BlobFileName}", reason, blobFileName);
+            }
+        }
+        catch (Exception blobEx)
+        {
+            _logger.LogError(blobEx, "Error during blob cleanup after {Reason}: {BlobUrl}", reason, blobUrl);
+        }
     }
 }
 

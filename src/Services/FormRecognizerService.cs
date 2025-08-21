@@ -249,6 +249,9 @@ public class FormRecognizerService : IFormRecognizerService
                 // Extract line items
                 ExtractLineItems(document, invoiceData, confidenceScores);
 
+                // Supplement missing part numbers from table data for prebuilt invoice model
+                SupplementPartNumbersFromTables(result, invoiceData, confidenceScores);
+
                 // Calculate parts vs labor costs
                 CalculatePartAndLaborTotals(invoiceData);
             }
@@ -635,6 +638,25 @@ public class FormRecognizerService : IFormRecognizerService
                     var item = itemField.Value.AsDictionary();
                     var lineItem = new InvoiceLineData { LineNumber = lineNumber++ };
 
+                    // Debug: Log all available fields for this line item
+                    _logger.LogInformation("Items field debugging - Line {LineNumber} has {FieldCount} fields: {Fields}", 
+                        lineItem.LineNumber, item.Count, string.Join(", ", item.Keys));
+                    
+                    // Debug: Log field values for better understanding
+                    foreach (var kvp in item)
+                    {
+                        var fieldValue = kvp.Value?.FieldType switch
+                        {
+                            DocumentFieldType.String => kvp.Value.Value.AsString(),
+                            DocumentFieldType.Double => kvp.Value.Value.AsDouble().ToString(),
+                            DocumentFieldType.Int64 => kvp.Value.Value.AsInt64().ToString(),
+                            DocumentFieldType.Currency => kvp.Value.Value.AsCurrency().Amount.ToString(),
+                            _ => kvp.Value?.ToString() ?? "null"
+                        };
+                        _logger.LogInformation("Items field debugging - Line {LineNumber}: {FieldName} = '{FieldValue}' (Type: {FieldType})", 
+                            lineItem.LineNumber, kvp.Key, fieldValue, kvp.Value?.FieldType);
+                    }
+
                     if (item.TryGetValue("Description", out var descField) && descField.FieldType == DocumentFieldType.String)
                     {
                         lineItem.Description = descField.Value.AsString();
@@ -667,8 +689,56 @@ public class FormRecognizerService : IFormRecognizerService
                         lineItem.UnitCost = lineItem.TotalCost / lineItem.Quantity;
                     }
 
-                    // Classify the line item
+                    // Classify the line item first
                     lineItem.Category = ClassifyLineItem(lineItem.Description);
+
+                    // Extract part number only for Parts line items
+                    if (lineItem.Category == "Parts")
+                    {
+                        // First, try to get from dedicated PartNumber field
+                        if (item.TryGetValue("PartNumber", out var partNumberField) && partNumberField.FieldType == DocumentFieldType.String)
+                        {
+                            var partNumber = partNumberField.Value.AsString();
+                            if (!string.IsNullOrWhiteSpace(partNumber))
+                            {
+                                lineItem.PartNumber = partNumber.Trim();
+                                confidenceScores.Add(partNumberField.Confidence ?? 0);
+                                _logger.LogInformation("Items field - Found part number '{PartNumber}' from dedicated PartNumber field for line {LineNumber}", lineItem.PartNumber, lineItem.LineNumber);
+                            }
+                        }
+                        
+                        // Fallback: Try to extract from description if no dedicated field found
+                        if (string.IsNullOrWhiteSpace(lineItem.PartNumber) && !string.IsNullOrWhiteSpace(lineItem.Description))
+                        {
+                            var extractedPartNumber = ExtractPartNumberFromDescription(lineItem.Description);
+                            if (!string.IsNullOrWhiteSpace(extractedPartNumber))
+                            {
+                                lineItem.PartNumber = extractedPartNumber;
+                                _logger.LogInformation("Items field - Extracted part number '{PartNumber}' from description for line {LineNumber}: '{Description}'", lineItem.PartNumber, lineItem.LineNumber, lineItem.Description);
+                            }
+                        }
+                        
+                        // Additional fallback: Try other potential fields
+                        if (string.IsNullOrWhiteSpace(lineItem.PartNumber))
+                        {
+                            // Check for ProductCode, ItemCode, or similar fields
+                            var potentialPartNumberFields = new[] { "ProductCode", "ItemCode", "Code", "SKU", "Part" };
+                            foreach (var fieldName in potentialPartNumberFields)
+                            {
+                                if (item.TryGetValue(fieldName, out var codeField) && codeField.FieldType == DocumentFieldType.String)
+                                {
+                                    var code = codeField.Value.AsString();
+                                    if (!string.IsNullOrWhiteSpace(code) && IsLikelyPartNumber(code.Trim()))
+                                    {
+                                        lineItem.PartNumber = code.Trim();
+                                        confidenceScores.Add(codeField.Confidence ?? 0);
+                                        _logger.LogInformation("Items field - Found part number '{PartNumber}' from {FieldName} field for line {LineNumber}", lineItem.PartNumber, fieldName, lineItem.LineNumber);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     
                     // Calculate confidence for this line
                     var lineConfidences = new List<float>();
@@ -683,6 +753,72 @@ public class FormRecognizerService : IFormRecognizerService
                 }
             }
         }
+    }
+
+    private string? ExtractPartNumberFromDescription(string description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return null;
+
+        // Common part number patterns for automotive parts
+        var partNumberPatterns = new[]
+        {
+            // Honda/Acura format: 15400-RFA-003
+            @"\b\d{5}-[A-Z]{3}-\d{3}\b",
+            
+            // General alphanumeric patterns: ABC123, 12345-ABC, A1B2C3
+            @"\b[A-Z0-9]{3,}-[A-Z0-9]{2,}\b",
+            @"\b[A-Z0-9]{5,12}\b",
+            
+            // Pattern with dash: 12345-67890
+            @"\b\d{4,6}-\d{3,6}\b",
+            
+            // Pattern like: P123456, PN123456
+            @"\bP[N]?\d{4,8}\b"
+        };
+
+        foreach (var pattern in partNumberPatterns)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(description, pattern, 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            if (match.Success)
+            {
+                var candidate = match.Value.Trim();
+                if (IsLikelyPartNumber(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsLikelyPartNumber(string candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate) || candidate.Length < 3)
+            return false;
+
+        // Must contain at least one digit or letter
+        if (!System.Text.RegularExpressions.Regex.IsMatch(candidate, @"[A-Z0-9]", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            return false;
+
+        // Should not be purely numeric unless it's long enough to be a part number
+        if (System.Text.RegularExpressions.Regex.IsMatch(candidate, @"^\d+$"))
+        {
+            return candidate.Length >= 5; // At least 5 digits for numeric part numbers
+        }
+
+        // Should not be common words
+        var commonWords = new[] { "the", "and", "for", "with", "item", "part", "qty", "each", "service", "oil", "filter" };
+        if (commonWords.Any(word => candidate.Equals(word, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        // Good patterns: contains mix of letters and numbers, or has dashes
+        return System.Text.RegularExpressions.Regex.IsMatch(candidate, @"[A-Z].*\d|\d.*[A-Z]|-", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     private string ClassifyLineItem(string description)
@@ -1059,6 +1195,9 @@ public class FormRecognizerService : IFormRecognizerService
                 headers = firstRowCells.Select(c => c.Content.ToLowerInvariant()).ToList();
             }
 
+            // Debug: Log detected headers
+            _logger.LogInformation("ExtractFromTables - Table headers detected: {Headers}", string.Join(", ", headers.Select((h, i) => $"Col{i}: '{h}'")));
+
             // Process data rows
             for (int row = 1; row < table.RowCount; row++)
             {
@@ -1075,6 +1214,15 @@ public class FormRecognizerService : IFormRecognizerService
                     if (header.Contains("description") || header.Contains("item"))
                     {
                         lineItem.Description = cellValue;
+                    }
+                    else if (header.Contains("part") && (header.Contains("number") || header.Contains("no") || header.Contains("#")))
+                    {
+                        // Store potential part number - will be filtered by classification later
+                        if (!string.IsNullOrWhiteSpace(cellValue))
+                        {
+                            lineItem.PartNumber = cellValue.Trim();
+                            _logger.LogInformation("ExtractFromTables - Found part number '{PartNumber}' in column '{Header}' for line {LineNumber}", cellValue.Trim(), header, row);
+                        }
                     }
                     else if (header.Contains("quantity") || header.Contains("qty"))
                     {
@@ -1107,7 +1255,15 @@ public class FormRecognizerService : IFormRecognizerService
                 if (lineItem.TotalCost == 0 && lineItem.UnitCost > 0)
                     lineItem.TotalCost = lineItem.UnitCost * lineItem.Quantity;
 
+                // Classify the line item
                 lineItem.Category = ClassifyLineItem(lineItem.Description);
+
+                // Only keep part numbers for Parts line items - clear for others
+                if (lineItem.Category != "Parts")
+                {
+                    lineItem.PartNumber = null;
+                }
+
                 lineItem.ConfidenceScore = 60; // Medium confidence for table extraction
 
                 if (!string.IsNullOrEmpty(lineItem.Description))
@@ -1181,6 +1337,12 @@ public class FormRecognizerService : IFormRecognizerService
         foreach (var table in result.Tables)
         {
             ProcessTableForLineItems(table, invoiceData, confidenceScores);
+        }
+
+        // For prebuilt invoice model, supplement missing part numbers from table data
+        if (modelType == "prebuilt-invoice")
+        {
+            SupplementPartNumbersFromTables(result, invoiceData, confidenceScores);
         }
 
         // Calculate derived fields
@@ -1271,6 +1433,9 @@ public class FormRecognizerService : IFormRecognizerService
             headers[cell.ColumnIndex] = cell.Content?.ToLowerInvariant() ?? "";
         }
 
+        // Debug: Log detected headers
+        _logger.LogInformation("Table headers detected: {Headers}", string.Join(", ", headers.Values.Select((h, i) => $"Col{i}: '{h}'")));
+
         // Process data rows
         for (int rowIndex = 1; rowIndex < table.RowCount; rowIndex++)
         {
@@ -1292,6 +1457,16 @@ public class FormRecognizerService : IFormRecognizerService
                 if (header.Contains("description") || header.Contains("item") || header.Contains("service"))
                 {
                     lineItem.Description = content;
+                    hasData = true;
+                }
+                else if (header.Contains("part") && (header.Contains("number") || header.Contains("no") || header.Contains("#")))
+                {
+                    // Store potential part number - will be filtered by classification later
+                    if (!string.IsNullOrWhiteSpace(content))
+                    {
+                        lineItem.PartNumber = content.Trim();
+                        _logger.LogInformation("Found part number '{PartNumber}' in column '{Header}' for line {LineNumber}", content.Trim(), header, rowIndex);
+                    }
                     hasData = true;
                 }
                 else if (header.Contains("quantity") || header.Contains("qty"))
@@ -1337,7 +1512,15 @@ public class FormRecognizerService : IFormRecognizerService
                 if (lineItem.TotalCost == 0 && lineItem.UnitCost > 0)
                     lineItem.TotalCost = lineItem.UnitCost * lineItem.Quantity;
 
+                // Classify the line item
                 lineItem.Category = ClassifyLineItem(lineItem.Description);
+
+                // Only keep part numbers for Parts line items - clear for others
+                if (lineItem.Category != "Parts")
+                {
+                    lineItem.PartNumber = null;
+                }
+
                 lineItem.ConfidenceScore = 70; // Good confidence for table extraction
 
                 invoiceData.LineItems.Add(lineItem);
@@ -1481,6 +1664,109 @@ public class FormRecognizerService : IFormRecognizerService
         };
 
         return validItemKeywords.Any(keyword => desc.Contains(keyword));
+    }
+
+    /// <summary>
+    /// Supplement missing part numbers from table data when prebuilt invoice model Items field doesn't contain them
+    /// </summary>
+    private void SupplementPartNumbersFromTables(AnalyzeResult result, InvoiceData invoiceData, List<float> confidenceScores)
+    {
+        _logger.LogInformation("SupplementPartNumbersFromTables - Checking {TableCount} tables for part numbers", result.Tables.Count);
+
+        foreach (var table in result.Tables)
+        {
+            if (table.RowCount <= 1) continue; // Need at least header + data
+
+            // Get column headers from first row
+            var headers = new Dictionary<int, string>();
+            var headerCells = table.Cells.Where(c => c.RowIndex == 0).ToList();
+            foreach (var cell in headerCells)
+            {
+                headers[cell.ColumnIndex] = cell.Content?.ToLowerInvariant() ?? "";
+            }
+
+            _logger.LogInformation("SupplementPartNumbersFromTables - Table headers detected: {Headers}", 
+                string.Join(", ", headers.Values.Select((h, i) => $"Col{i}: '{h}'")));
+
+            // Find part number column
+            int partNumberColumnIndex = -1;
+            foreach (var header in headers)
+            {
+                if (header.Value.Contains("part") && (header.Value.Contains("number") || header.Value.Contains("no") || header.Value.Contains("#")))
+                {
+                    partNumberColumnIndex = header.Key;
+                    _logger.LogInformation("SupplementPartNumbersFromTables - Found part number column at index {ColumnIndex}: '{Header}'", 
+                        partNumberColumnIndex, header.Value);
+                    break;
+                }
+            }
+
+            if (partNumberColumnIndex == -1)
+            {
+                _logger.LogInformation("SupplementPartNumbersFromTables - No part number column found in this table");
+                continue;
+            }
+
+            // Find description column for matching
+            int descriptionColumnIndex = -1;
+            foreach (var header in headers)
+            {
+                if (header.Value.Contains("description") || header.Value.Contains("item"))
+                {
+                    descriptionColumnIndex = header.Key;
+                    break;
+                }
+            }
+
+            // Process data rows and match with existing line items
+            for (int rowIndex = 1; rowIndex < table.RowCount; rowIndex++)
+            {
+                var partNumberCell = table.Cells.FirstOrDefault(c => c.RowIndex == rowIndex && c.ColumnIndex == partNumberColumnIndex);
+                var descriptionCell = table.Cells.FirstOrDefault(c => c.RowIndex == rowIndex && c.ColumnIndex == descriptionColumnIndex);
+
+                if (partNumberCell == null || string.IsNullOrWhiteSpace(partNumberCell.Content)) continue;
+
+                var partNumber = partNumberCell.Content.Trim();
+                var tableDescription = descriptionCell?.Content?.Trim() ?? "";
+
+                _logger.LogInformation("SupplementPartNumbersFromTables - Row {RowIndex}: Part Number = '{PartNumber}', Description = '{Description}'", 
+                    rowIndex, partNumber, tableDescription);
+
+                // Find matching line item in invoiceData by description or line number
+                InvoiceLineData? matchingItem = null;
+                
+                // Try to match by description first
+                if (!string.IsNullOrEmpty(tableDescription))
+                {
+                    matchingItem = invoiceData.LineItems.FirstOrDefault(item => 
+                        !string.IsNullOrEmpty(item.Description) && 
+                        item.Description.Contains(tableDescription, StringComparison.OrdinalIgnoreCase));
+                }
+
+                // If no match by description, try by line number (accounting for header row)
+                if (matchingItem == null && rowIndex <= invoiceData.LineItems.Count)
+                {
+                    matchingItem = invoiceData.LineItems.ElementAtOrDefault(rowIndex - 1);
+                }
+
+                // Update part number if we found a match and it doesn't already have a part number
+                if (matchingItem != null && string.IsNullOrEmpty(matchingItem.PartNumber))
+                {
+                    matchingItem.PartNumber = partNumber;
+                    _logger.LogInformation("SupplementPartNumbersFromTables - Added part number '{PartNumber}' to line item '{Description}'", 
+                        partNumber, matchingItem.Description);
+                }
+                else if (matchingItem != null)
+                {
+                    _logger.LogInformation("SupplementPartNumbersFromTables - Line item '{Description}' already has part number '{ExistingPartNumber}'", 
+                        matchingItem.Description, matchingItem.PartNumber);
+                }
+                else
+                {
+                    _logger.LogInformation("SupplementPartNumbersFromTables - Could not find matching line item for part number '{PartNumber}'", partNumber);
+                }
+            }
+        }
     }
 
     #endregion

@@ -156,6 +156,6 @@ public class HomeController : Controller
     public IActionResult TestUpload()
     {
         _logger.LogInformation("TestUpload action called");
-        return Json(new { message = "TestUpload action reached successfully", timestamp = DateTime.Now });
+        return Json(new { message = "TestUpload action reached successfully", timestamp = DateTime.UtcNow });
     }
 }

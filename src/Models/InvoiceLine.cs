@@ -84,7 +84,7 @@ public class InvoiceLine
     public decimal? ExtractionConfidence { get; set; }
 
     [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; }
 
     // Navigation properties
     [ForeignKey("InvoiceID")]

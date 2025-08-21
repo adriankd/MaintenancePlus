@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VehicleMaintenanceInvoiceSystem.Data;
 
@@ -11,9 +12,11 @@ using VehicleMaintenanceInvoiceSystem.Data;
 namespace VehicleMaintenanceInvoiceSystem.Migrations
 {
     [DbContext(typeof(InvoiceDbContext))]
-    partial class InvoiceDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250819160517_FixCascadeDeletePaths")]
+    partial class FixCascadeDeletePaths
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -47,7 +50,7 @@ namespace VehicleMaintenanceInvoiceSystem.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasDefaultValueSql("GETDATE()");
 
                     b.Property<DateTime>("DatePeriod")
                         .HasColumnType("datetime2");
@@ -96,7 +99,7 @@ namespace VehicleMaintenanceInvoiceSystem.Migrations
                     b.Property<DateTime>("FeedbackDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasDefaultValueSql("GETDATE()");
 
                     b.Property<int>("InvoiceID")
                         .HasColumnType("int");
@@ -165,7 +168,7 @@ namespace VehicleMaintenanceInvoiceSystem.Migrations
                     b.Property<DateTime>("FeedbackDate")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasDefaultValueSql("GETDATE()");
 
                     b.Property<string>("FieldType")
                         .IsRequired()
@@ -239,7 +242,7 @@ namespace VehicleMaintenanceInvoiceSystem.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasDefaultValueSql("GETDATE()");
 
                     b.Property<string>("ExtractedData")
                         .HasColumnType("nvarchar(max)");
@@ -346,7 +349,7 @@ namespace VehicleMaintenanceInvoiceSystem.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValueSql("GETUTCDATE()");
+                        .HasDefaultValueSql("GETDATE()");
 
                     b.Property<string>("Description")
                         .IsRequired()
