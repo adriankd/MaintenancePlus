@@ -3,6 +3,7 @@ using VehicleMaintenanceInvoiceSystem.Services;
 using VehicleMaintenanceInvoiceSystem.Data;
 using VehicleMaintenanceInvoiceSystem.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace VehicleMaintenanceInvoiceSystem.Controllers;
 
@@ -200,7 +201,9 @@ public class IntelligenceController : ControllerBase
                         break;
                     case "odometerlabel":
                         // Apply the user-corrected value to the actual Odometer field
-                        if (int.TryParse(request.ExpectedValue, out var odometerValue))
+                        // Support comma-separated numbers and whitespace (e.g., "67,890", " 123,456 ")
+                        var trimmedOdometer = request.ExpectedValue?.Trim();
+                        if (int.TryParse(trimmedOdometer, NumberStyles.AllowThousands | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite, CultureInfo.InvariantCulture, out var odometerValue))
                         {
                             invoice.Odometer = odometerValue;
                             invoice.NormalizationVersion = "User Corrected";
@@ -243,7 +246,7 @@ public class IntelligenceController : ControllerBase
             }
 
             // Record in intelligence service for potential retraining
-            await _intelligenceService.RecordNormalizationFeedbackAsync(invoiceId, request.FieldName, request.ExpectedValue, request.UserId ?? "anonymous");
+            await _intelligenceService.RecordNormalizationFeedbackAsync(invoiceId, request.FieldName, request.ExpectedValue ?? "", request.UserId ?? "anonymous");
 
             _logger.LogInformation("Normalization feedback recorded for invoice {InvoiceId}, field {FieldName}: {OriginalValue} → {ExpectedValue}",
                 invoiceId, request.FieldName, request.OriginalValue, request.ExpectedValue);
