@@ -186,13 +186,39 @@ public class IntelligenceController : ControllerBase
                 switch (request.FieldName.ToLower())
                 {
                     case "vehiclelabel":
-                        // Update with corrected normalization
+                        // Apply the user-corrected value to the actual VehicleID field
+                        invoice.VehicleID = request.ExpectedValue;
                         invoice.NormalizationVersion = "User Corrected";
                         break;
                     case "odometerlabel":
-                        invoice.NormalizationVersion = "User Corrected";
+                        // Apply the user-corrected value to the actual Odometer field
+                        if (int.TryParse(request.ExpectedValue, out var odometerValue))
+                        {
+                            invoice.Odometer = odometerValue;
+                            invoice.NormalizationVersion = "User Corrected";
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Invalid odometer value provided: {Value}", request.ExpectedValue);
+                        }
                         break;
                     case "invoicelabel":
+                        // Apply the user-corrected value to the actual InvoiceNumber field
+                        // First check if the new invoice number already exists
+                        var existingInvoice = await _context.InvoiceHeaders
+                            .Where(i => i.InvoiceNumber == request.ExpectedValue && i.InvoiceID != invoiceId)
+                            .FirstOrDefaultAsync();
+                        
+                        if (existingInvoice != null)
+                        {
+                            return BadRequest(new 
+                            { 
+                                success = false, 
+                                message = $"Invoice number '{request.ExpectedValue}' already exists. Please choose a different number or resolve the conflict." 
+                            });
+                        }
+                        
+                        invoice.InvoiceNumber = request.ExpectedValue;
                         invoice.NormalizationVersion = "User Corrected";
                         break;
                 }
@@ -244,12 +270,17 @@ public class IntelligenceController : ControllerBase
                 })
                 .ToListAsync();
 
-            var overall = feedbacks.Any() ? new
+            object? overall = null;
+            if (feedbacks.Any())
             {
-                TotalFeedbacks = feedbacks.Sum(f => f.TotalFeedbacks),
-                OverallAccuracy = feedbacks.Sum(f => f.CorrectPredictions) / (double)feedbacks.Sum(f => f.TotalFeedbacks) * 100,
-                AverageConfidence = feedbacks.Average(f => f.AverageConfidence)
-            } : null;
+                var total = feedbacks.Sum(f => f.TotalFeedbacks);
+                overall = new
+                {
+                    TotalFeedbacks = total,
+                    OverallAccuracy = total == 0 ? 0.0 : feedbacks.Sum(f => f.CorrectPredictions) / (double)total * 100,
+                    AverageConfidence = feedbacks.Average(f => f.AverageConfidence)
+                };
+            }
 
             return Ok(new
             {

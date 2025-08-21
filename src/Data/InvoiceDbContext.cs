@@ -96,11 +96,17 @@ public class InvoiceDbContext : DbContext
             entity.Property(e => e.OriginalConfidence).HasColumnType("decimal(5,2)");
             entity.Property(e => e.FeedbackDate).HasDefaultValueSql("GETDATE()");
 
-            // Foreign key relationship
+            // Foreign key relationships
             entity.HasOne(e => e.InvoiceLine)
                   .WithMany(e => e.ClassificationFeedbacks)
                   .HasForeignKey(e => e.LineID)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure InvoiceHeader relationship with Restrict to avoid multiple cascade paths
+            entity.HasOne(e => e.InvoiceHeader)
+                  .WithMany()
+                  .HasForeignKey(e => e.InvoiceID)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Configure FieldNormalizationFeedback  

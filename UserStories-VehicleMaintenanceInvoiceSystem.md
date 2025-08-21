@@ -3,8 +3,8 @@
 
 ### Document Information
 - **Product**: Vehicle Maintenance Invoice Processing System
-- **Version**: 1.1
-- **Date**: August 18, 2025
+- **Version**: 2.0
+- **Date**: August 19, 2025
 
 ---
 
@@ -682,6 +682,362 @@
 
 ---
 
+## Epic 8: Line Item Classification
+
+### US-022: Rule-Based Line Item Classification
+**As a** system administrator  
+**I want** the system to automatically classify invoice line items as "Part" or "Labor" using keyword-based rules  
+**So that** invoices are consistently categorized without manual data entry
+
+**Acceptance Criteria:**
+- Given an invoice line item has been extracted from OCR
+- When the classification process runs
+- Then the system analyzes the description text using predefined keywords
+- And classifies items containing "part", "filter", "oil", "brake", "tire", "battery" as "Part"
+- And classifies items containing "labor", "service", "diagnostic", "repair", "hour" as "Labor"
+- And assigns confidence scores based on keyword match strength
+- And stores the classification result with the method marked as "Rule-based"
+- And handles edge cases where no keywords match (default to manual review)
+- And achieves 75% accuracy on typical automotive maintenance invoices
+
+**Definition of Done:**
+- [ ] Keyword dictionary implemented with automotive terms
+- [ ] Classification algorithm with confidence scoring
+- [ ] Integration into invoice processing pipeline
+- [ ] Database schema updated to store classification results
+- [ ] Classification method and version tracking
+- [ ] Edge case handling for ambiguous descriptions
+- [ ] Unit tests for classification logic
+- [ ] Performance testing on sample invoices
+- [ ] Accuracy measurement framework
+
+**Story Points:** 8  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
+### US-023: Display Line Item Classifications
+**As a** fleet manager  
+**I want to** see the Part/Labor classification for each line item on invoice details  
+**So that** I can verify the system's categorization is accurate
+
+**Acceptance Criteria:**
+- Given I am viewing an invoice details page
+- When the page displays line items
+- Then each line item shows its classification (Part/Labor) with a visual indicator
+- And displays the confidence score as a percentage
+- And shows the classification method used (Rule-based, ML, Manual)
+- And uses distinct colors or icons for Part vs Labor categories
+- And includes tooltips explaining the classification criteria
+- And maintains responsive design on mobile and desktop
+
+**Definition of Done:**
+- [ ] UI components for classification display
+- [ ] Visual indicators (colors, icons, badges)
+- [ ] Confidence score formatting and display
+- [ ] Responsive design implementation
+- [ ] Tooltip functionality with explanations
+- [ ] Cross-browser compatibility testing
+- [ ] Accessibility compliance (screen readers)
+- [ ] Integration with existing invoice details page
+
+**Story Points:** 5  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
+### US-024: Classification Feedback Collection
+**As a** fleet manager  
+**I want to** correct misclassified line items and provide feedback  
+**So that** the system can learn from my corrections and improve accuracy over time
+
+**Acceptance Criteria:**
+- Given I am viewing an invoice with classified line items
+- When I see an incorrectly classified item
+- Then I can click a "Correct Classification" button next to the item
+- And select the correct classification (Part or Labor) from a dropdown
+- And optionally add a comment explaining the correction
+- And submit the feedback to be stored in the system
+- And see immediate visual confirmation that my feedback was recorded
+- And the corrected classification updates the display immediately
+- And the feedback is logged for future model training
+
+**Definition of Done:**
+- [ ] "Correct Classification" UI controls on line items
+- [ ] Feedback modal dialog with classification options
+- [ ] Comment field for user explanations
+- [ ] Feedback submission API endpoint
+- [ ] Database storage for classification feedback
+- [ ] Immediate UI updates after feedback submission
+- [ ] User identification and timestamp logging
+- [ ] Success/error message handling
+- [ ] Integration tests for feedback workflow
+
+**Story Points:** 8  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
+### US-025: Machine Learning Classification Model
+**As a** system administrator  
+**I want** to implement ML-based line item classification to improve accuracy beyond keyword rules  
+**So that** the system can handle complex descriptions and learn from accumulated feedback
+
+**Acceptance Criteria:**
+- Given sufficient training data from rule-based classification and user feedback
+- When the ML model training process runs
+- Then a text classification model is trained using ML.NET or Azure AI Language
+- And the model achieves 85% accuracy on validation data
+- And can process line item descriptions to predict Part vs Labor category
+- And provides confidence scores for each prediction
+- And integrates with the existing processing pipeline
+- And supports A/B testing against rule-based classification
+- And can be updated with new training data periodically
+
+**Definition of Done:**
+- [ ] ML.NET text classification model implementation
+- [ ] Training pipeline using existing classified data
+- [ ] Model evaluation and accuracy measurement
+- [ ] Integration with invoice processing workflow
+- [ ] A/B testing framework for model comparison
+- [ ] Model versioning and deployment system
+- [ ] Confidence threshold configuration
+- [ ] Performance benchmarking
+- [ ] Documentation for model training process
+
+**Story Points:** 13  
+**Priority:** Medium  
+**Sprint:** 6
+
+---
+
+### US-026: Batch Reclassification
+**As a** system administrator  
+**I want to** reclassify historical invoices when the classification model improves  
+**So that** all invoice data maintains consistent and accurate categorization
+
+**Acceptance Criteria:**
+- Given a new classification model has been deployed
+- When I trigger batch reclassification
+- Then the system identifies invoices processed with older classification versions
+- And processes all line items through the new classification model
+- And updates the database with new classifications and confidence scores
+- And preserves the original classification data for comparison
+- And provides progress tracking for large batch operations
+- And handles failures gracefully with retry capabilities
+- And generates a report of classification changes
+
+**Definition of Done:**
+- [ ] Batch reclassification API endpoint
+- [ ] Background job processing for large batches
+- [ ] Progress tracking and status reporting
+- [ ] Data migration logic preserving history
+- [ ] Error handling and retry mechanisms
+- [ ] Performance optimization for large datasets
+- [ ] Classification change reporting
+- [ ] Administrative UI for triggering batch operations
+- [ ] Unit and integration tests
+
+**Story Points:** 8  
+**Priority:** Medium  
+**Sprint:** 6
+
+---
+
+## Epic 9: Field Label Normalization
+
+### US-027: Dictionary-Based Field Normalization
+**As a** system administrator  
+**I want** the system to normalize inconsistent field labels from different invoice formats  
+**So that** data is consistently stored using standardized field names
+
+**Acceptance Criteria:**
+- Given an invoice has been processed by OCR extraction
+- When field normalization runs
+- Then the system maps common field variations to standardized names:
+  - "Invoice", "Invoice No", "RO#" → "InvoiceNumber"
+  - "Mileage", "Odometer" → "Odometer"  
+  - "Vehicle ID", "Vehicle Registration" → "VehicleRegistration"
+- And stores both original and normalized field labels
+- And handles case-insensitive matching
+- And provides confidence scores for normalization decisions
+- And logs all normalization activities for analysis
+
+**Definition of Done:**
+- [ ] Field normalization dictionary with common variations
+- [ ] Normalization algorithm with confidence scoring
+- [ ] Database schema updated to store original labels
+- [ ] Integration with OCR processing pipeline
+- [ ] Case-insensitive matching implementation
+- [ ] Normalization logging and audit trail
+- [ ] Unit tests for normalization logic
+- [ ] Configuration system for easy dictionary updates
+
+**Story Points:** 5  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
+### US-028: Display Normalized Field Information
+**As a** fleet manager  
+**I want to** see both original and normalized field labels on invoice details  
+**So that** I can verify the normalization is correct and understand how fields were mapped
+
+**Acceptance Criteria:**
+- Given I am viewing an invoice details page
+- When field normalization has been applied
+- Then I can see the standardized field labels in the main display
+- And can view the original extracted labels via hover tooltips or expandable sections
+- And see visual indicators when fields have been normalized
+- And view the confidence score for each normalization
+- And access a "Field Mapping" section showing all normalization decisions
+
+**Definition of Done:**
+- [ ] UI display of normalized field labels
+- [ ] Tooltip or expandable view for original labels
+- [ ] Visual indicators for normalized fields
+- [ ] Confidence score display formatting
+- [ ] Field mapping summary section
+- [ ] Responsive design for mobile/desktop
+- [ ] User experience testing
+- [ ] Integration with existing invoice details layout
+
+**Story Points:** 3  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
+### US-029: Field Normalization Feedback
+**As a** fleet manager  
+**I want to** correct incorrect field normalizations and provide feedback  
+**So that** the system can improve its field mapping accuracy over time
+
+**Acceptance Criteria:**
+- Given I am viewing an invoice with normalized fields
+- When I notice an incorrect field mapping
+- Then I can click "Report Incorrect Mapping" next to the field
+- And specify what the correct normalized field should be
+- And provide an optional comment explaining the correction
+- And submit the feedback to improve future normalizations
+- And see confirmation that my feedback was recorded
+- And the feedback is stored for system improvement
+
+**Definition of Done:**
+- [ ] "Report Incorrect Mapping" UI controls
+- [ ] Feedback modal with normalization correction options
+- [ ] Comment field for user explanations
+- [ ] Feedback submission and storage system
+- [ ] Database schema for normalization feedback
+- [ ] User identification and timestamp logging
+- [ ] Success confirmation and error handling
+- [ ] Integration tests for feedback collection
+
+**Story Points:** 5  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
+### US-030: Semantic Field Normalization
+**As a** system administrator  
+**I want** to implement semantic similarity matching for field normalization  
+**So that** the system can handle new field label variations not in the dictionary
+
+**Acceptance Criteria:**
+- Given a field label is not found in the normalization dictionary
+- When semantic normalization runs
+- Then the system uses embedding-based similarity to find the closest match
+- And calculates similarity scores against known normalized field names
+- And applies normalization when similarity exceeds confidence threshold
+- And routes low-confidence matches to manual review
+- And learns from user corrections to improve similarity matching
+- And handles new field variations discovered in invoices
+
+**Definition of Done:**
+- [ ] Embedding model integration (Azure OpenAI or sentence transformers)
+- [ ] Similarity calculation and threshold configuration
+- [ ] Integration with existing normalization pipeline
+- [ ] Manual review workflow for low-confidence matches
+- [ ] Learning pipeline from user feedback
+- [ ] Performance optimization for real-time processing
+- [ ] Accuracy measurement and monitoring
+- [ ] Documentation for similarity threshold tuning
+
+**Story Points:** 13  
+**Priority:** Medium  
+**Sprint:** 7
+
+---
+
+### US-031: Normalization Accuracy Monitoring
+**As a** system administrator  
+**I want to** monitor field normalization accuracy and performance over time  
+**So that** I can identify areas for improvement and track system effectiveness
+
+**Acceptance Criteria:**
+- Given field normalization has been running for a period of time
+- When I access the normalization monitoring dashboard
+- Then I can see accuracy metrics by field type and time period
+- And view trends in normalization confidence scores
+- And see the most common user corrections
+- And identify field variations that frequently cause problems
+- And track the impact of system improvements over time
+- And export reports for analysis and documentation
+
+**Definition of Done:**
+- [ ] Normalization accuracy tracking system
+- [ ] Dashboard displaying metrics and trends
+- [ ] User correction analysis and reporting
+- [ ] Problem field identification algorithms
+- [ ] Historical trend visualization
+- [ ] Report export functionality
+- [ ] Administrative access controls
+- [ ] Performance monitoring for dashboard queries
+
+**Story Points:** 8  
+**Priority:** Medium  
+**Sprint:** 7
+
+---
+
+## Epic 10: Unified Processing Pipeline Enhancement
+
+### US-032: Enhanced Processing Pipeline Integration
+**As a** system architect  
+**I want** to integrate classification and normalization into the core invoice processing workflow  
+**So that** all invoices benefit from intelligent processing without disrupting existing functionality
+
+**Acceptance Criteria:**
+- Given an invoice file is uploaded for processing
+- When the processing pipeline executes
+- Then the workflow follows: OCR Extract → Normalize Fields → Classify Line Items → Store Data
+- And each step preserves metadata and confidence scores
+- And processing continues gracefully if individual steps fail partially  
+- And the system maintains backward compatibility with existing data
+- And processing time remains under 30 seconds per invoice
+- And all steps are logged for debugging and audit purposes
+
+**Definition of Done:**
+- [ ] Unified processing pipeline architecture
+- [ ] Integration points for normalization and classification
+- [ ] Error handling and graceful degradation
+- [ ] Backward compatibility with existing invoices
+- [ ] Performance optimization and monitoring
+- [ ] Comprehensive logging and audit trail
+- [ ] Integration tests for full pipeline
+- [ ] Documentation for pipeline architecture
+
+**Story Points:** 8  
+**Priority:** High  
+**Sprint:** 5
+
+---
+
 ## Updated Summary
 
 ### Story Point Distribution by Sprint
@@ -689,40 +1045,51 @@
 - **Sprint 2**: 21 points (Core Processing)
 - **Sprint 3**: 14 points (API Development)
 - **Sprint 4**: 24 points (Quality & Core Approval Features)
-- **Sprint 5**: 13 points (Advanced Approval Features)
-- **Sprint 6**: 8 points (Audit & Compliance)
+- **Sprint 5**: 29 points (Intelligence Features - Classification & Normalization)
+- **Sprint 6**: 21 points (Advanced ML Features)
+- **Sprint 7**: 21 points (Semantic Enhancement & Monitoring)
 
-**Total**: 88 story points
+**Total**: 138 story points
 
 ### Priority Distribution
-- **High Priority**: 15 stories (Core functionality + Approval workflow)
-- **Medium Priority**: 6 stories (Enhancement features)
+- **High Priority**: 22 stories (Core functionality + Approval workflow + Intelligence features)
+- **Medium Priority**: 10 stories (Enhancement features + Advanced ML)
 - **Low Priority**: 1 story (Audit trail)
-
-### Priority Distribution
-- **High Priority**: 9 stories (Core functionality)
-- **Medium Priority**: 4 stories (Enhancement features)
 
 ### Epic Summary
 1. **File Upload & Storage**: 2 stories, 8 points
-2. **Data Extraction**: 3 stories, 21 points
+2. **Data Extraction**: 3 stories, 21 points  
 3. **Data Validation**: 1 story, 5 points
 4. **API Development**: 4 stories, 14 points
 5. **System Administration**: 2 stories, 10 points
 6. **Performance**: 1 story, 8 points
 7. **Invoice Approval Workflow**: 8 stories, 39 points
+8. **Line Item Classification**: 5 stories, 42 points  
+9. **Field Label Normalization**: 5 stories, 34 points
+10. **Unified Processing Pipeline**: 1 story, 8 points
 
-### New Epic 7: Invoice Approval Workflow Details
-- **US-014**: View Invoice Approval Status (3 points) - UI status display
-- **US-015**: Approve Invoice (5 points) - Core approval functionality  
-- **US-016**: Reject Invoice with Complete Deletion (8 points) - Core rejection functionality
-- **US-017**: Approval Workflow API Endpoints (5 points) - API integration
-- **US-018**: Approval Status Filtering (5 points) - Search and filter capabilities
-- **US-019**: Bulk Approval Operations (8 points) - Batch processing
-- **US-020**: Approval History and Audit Trail (8 points) - Compliance and reporting
-- **US-021**: Database Schema Migration (3 points) - Infrastructure support
+### New Intelligence Features Implementation Priority
 
-### Approval Feature Implementation Priority
-1. **Phase 1 (Sprint 4)**: Core approval/rejection functionality (US-014, US-015, US-016, US-017, US-021)
-2. **Phase 2 (Sprint 5)**: Enhanced user experience (US-018, US-019)  
-3. **Phase 3 (Sprint 6)**: Audit and compliance features (US-020)
+#### Epic 8: Line Item Classification Details
+- **US-022**: Rule-Based Line Item Classification (8 points) - Core classification logic
+- **US-023**: Display Line Item Classifications (5 points) - UI display of classifications  
+- **US-024**: Classification Feedback Collection (8 points) - User correction system
+- **US-025**: Machine Learning Classification Model (13 points) - ML enhancement
+- **US-026**: Batch Reclassification (8 points) - Historical data processing
+
+#### Epic 9: Field Label Normalization Details  
+- **US-027**: Dictionary-Based Field Normalization (5 points) - Core normalization logic
+- **US-028**: Display Normalized Field Information (3 points) - UI display of normalizations
+- **US-029**: Field Normalization Feedback (5 points) - User correction system
+- **US-030**: Semantic Field Normalization (13 points) - ML-based similarity matching
+- **US-031**: Normalization Accuracy Monitoring (8 points) - Analytics and monitoring
+
+#### Epic 10: Processing Pipeline Enhancement
+- **US-032**: Enhanced Processing Pipeline Integration (8 points) - Unified workflow
+
+### Implementation Phases
+1. **Phase 1 (Sprint 4)**: Core approval/rejection functionality
+2. **Phase 2 (Sprint 5)**: Rule-based intelligence features (classification & normalization)
+3. **Phase 3 (Sprint 6)**: Machine learning enhancements  
+4. **Phase 4 (Sprint 7)**: Advanced semantic features and monitoring
+5. **Phase 5 (Future)**: Additional approval workflow enhancements

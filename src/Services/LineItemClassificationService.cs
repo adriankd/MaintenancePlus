@@ -188,12 +188,6 @@ public class RuleBasedLineItemClassifier : ILineItemClassifier
             partScore += 15;
         }
 
-        // Service action words indicate labor
-        if (ContainsServiceAction(description))
-        {
-            laborScore += 10;
-        }
-
         // Determine classification
         if (partScore > laborScore)
         {

@@ -3,8 +3,8 @@
 
 ### Document Information
 - **Product Name**: Vehicle Maintenance Invoice Processing System
-- **Version**: 1.1
-- **Date**: August 18, 2025
+- **Version**: 2.0
+- **Date**: August 21, 2025
 - **Product Manager**: [To be assigned]
 - **Development Team**: 2 Developers (Backend/Frontend)
 
@@ -20,9 +20,13 @@ Develop a cloud-native C# web application that automates the extraction and proc
 - **Integration**: Provide API-driven access to structured invoice data
 - **Scalability**: Leverage Azure cloud services for enterprise-scale deployment
 - **Compliance**: Maintain audit trails with original document storage
+- **Intelligence**: Automatically classify invoice line items and normalize field labels
+- **Continuous Learning**: Implement feedback loops for improving classification accuracy over time
 
 ### Success Metrics
 - 95% accuracy in data extraction from supported invoice formats
+- 90% accuracy in line item classification (Part vs Labor)
+- 85% accuracy in field label normalization
 - Processing time < 30 seconds per invoice
 - 99.9% API uptime
 - Support for 1000+ invoices per day
@@ -35,13 +39,16 @@ Develop a cloud-native C# web application that automates the extraction and proc
 ### Core Functionality
 The system processes vehicle maintenance invoices through the following workflow:
 1. **Upload**: Users upload PDF/PNG invoice files via web interface
-2. **Extract**: OCR technology extracts structured data from documents
-3. **Store**: Structured data saved to Azure SQL Database
-4. **Archive**: Original files stored in Azure Blob Storage with secure access
-5. **Review**: Users can view invoice details and approve or reject the processed invoice
-6. **Approve/Reject**: Users can approve invoices for final acceptance or reject and delete them
-7. **Access**: RESTful API provides data access for external systems
-8. **View**: Users can view/download original invoice files through secure links
+2. **Extract**: Azure Form Recognizer extracts structured data from documents
+3. **Normalize**: Field labels are standardized using the Field Label Normalization engine
+4. **Classify**: Line items are automatically classified as "Part" or "Labor" using ML classification
+5. **Store**: Structured data saved to Azure SQL Database with normalized labels and classifications
+6. **Archive**: Original files stored in Azure Blob Storage with secure access
+7. **Review**: Users can view invoice details and approve or reject the processed invoice
+8. **Feedback**: Users can correct misclassifications to improve future accuracy
+9. **Approve/Reject**: Users can approve invoices for final acceptance or reject and delete them
+10. **Access**: RESTful API provides data access for external systems
+11. **View**: Users can view/download original invoice files through secure links
 
 ### Target Users
 - **Primary**: Fleet managers and maintenance administrators
@@ -68,42 +75,165 @@ The system processes vehicle maintenance invoices through the following workflow
   - Extract Invoice Header data with 95% accuracy
   - Extract Invoice Line items with 90% accuracy
   - Handle multiple vendor invoice formats and layouts
-  - Automatically classify line items as Parts, Labor, or Mixed
   - Support varying table structures (separate vs combined line items)
   - Provide confidence scores for extracted data
   - Route low-confidence extractions for manual review
 
-#### FR-003: Data Validation
+#### FR-003: Numeric Data Extraction with Format Handling
+- **Description**: Extract and parse numeric data from invoices, handling various formatting conventions
+- **Acceptance Criteria**:
+  - **Odometer/Mileage Reading Extraction**:
+    - Support standard numeric formats (e.g., "67890", "123456")
+    - Support comma-separated numeric formats (e.g., "67,890", "123,456", "1,234,567")
+    - Automatically detect and parse both formats without user intervention
+    - Convert comma-separated numbers to standard integers for database storage
+    - Maintain extraction accuracy of 95% across all numeric formats
+    - Handle edge cases such as leading/trailing spaces around numbers
+    - Preserve original extracted text alongside parsed numeric value for audit purposes
+  - **Currency and Cost Extraction**:
+    - Support various currency formats with and without thousand separators
+    - Handle decimal precision for monetary values
+    - Extract totals, line costs, and tax amounts accurately
+  - **General Numeric Field Processing**:
+    - Apply consistent formatting rules across all numeric fields
+    - Validate extracted numbers are within expected ranges
+    - Flag unusual or suspicious numeric values for manual review
+
+#### FR-004: Data Validation
 - **Description**: Validate extracted data before database storage
 - **Acceptance Criteria**:
   - Validate required fields are present
   - Check data type consistency
+  - Validate numeric data is properly formatted and within expected ranges
   - Flag incomplete extractions for manual review
 
-#### FR-004: Data Mapping and Transformation
+#### FR-005: Part Number Extraction and Storage
+- **Description**: Extract part numbers from parts-only invoice line items and store them in the database for inventory and procurement tracking
+- **Acceptance Criteria**:
+  - **Line Item Type Filtering**:
+    - Only attempt part number extraction for line items classified as "Parts" 
+    - Do not extract part numbers from Labor, Tax, Fee, or Service line items
+    - Apply part number extraction after line item classification is complete
+  - **Extraction Source Limitations**:
+    - Extract part numbers ONLY from dedicated part number columns in invoice tables
+    - Do not attempt to parse or extract part numbers from item descriptions
+    - Do not use regex pattern matching on description text
+    - Only use explicitly labeled part number fields (e.g., "Part Number", "Part No", "PN", "Item Number")
+  - **Data Processing Requirements**:
+    - Store extracted part numbers in the `PartNumber` column of `InvoiceLines` table
+    - Preserve original format and casing of part numbers exactly as found
+    - Handle missing part number columns gracefully (store as NULL)
+    - Store empty/blank part number fields as NULL (not empty string)
+  - **Quality and Validation**:
+    - Achieve 95% accuracy in part number extraction from dedicated columns when present
+    - Only extract data from clearly identified part number table columns
+    - Flag invoices without part number columns for manual review if needed
+    - Maintain audit trail showing which column was used for part number extraction
+
+#### FR-006: Data Mapping and Transformation
 - **Description**: Transform extracted invoice data into normalized database structure
 - **Acceptance Criteria**:
   - Map header fields to InvoiceHeader table columns
   - Map all line items to InvoiceLines table with proper categorization
+  - **Extract and store part numbers from dedicated part number columns for Parts-only line items**
+  - **Only extract part numbers from clearly labeled part number table columns, not descriptions**
   - Calculate and validate totals (parts vs labor vs total cost)
   - Assign sequential line numbers to detail items
   - Classify line items by type (Parts, Labor, Tax, Fees, Services)
   - Maintain referential integrity between header and line records
   - Handle missing or incomplete line item data gracefully
+  - **Store part numbers in the PartNumber column only for Parts line items**
+  - **Store NULL for PartNumber when no dedicated part number column exists or item is not a Part**
+
+#### FR-007: Line Item Classification
+- **Description**: Automatically classify invoice line items as "Part" or "Labor" based on description text analysis
+- **Acceptance Criteria**:
+  - Implement keyword-based classification rules as initial solution
+  - Achieve 85% accuracy on initial keyword-based classification
+  - Store classification results in database with confidence scores
+  - Support user feedback to correct misclassifications
+  - Log all classification decisions for model training
+  - Provide fallback classification when confidence is low
+  - Handle edge cases (mixed items, unclear descriptions)
+  - Support batch reclassification of historical data
+
+#### FR-008: Machine Learning Classification Enhancement
+- **Description**: Evolve from rule-based to ML-based line item classification for improved accuracy
+- **Acceptance Criteria**:
+  - Implement ML.NET text classification model or Azure AI Language custom classifier
+  - Train model using accumulated feedback data from keyword-based phase
+  - Achieve 90% accuracy on line item classification
+  - Support incremental model retraining with new feedback data
+  - Provide confidence scores for ML-based classifications
+  - Maintain backward compatibility with existing classification data
+  - Implement A/B testing framework to compare rule-based vs ML approaches
+  - Support model versioning and rollback capabilities
+
+#### FR-009: Field Label Normalization
+- **Description**: Standardize inconsistent field labels from various invoice formats to database schema
+- **Acceptance Criteria**:
+  - Implement dictionary-based lookup for common field variations
+  - Normalize "Invoice"/"Invoice No"/"RO#" → "InvoiceNumber"
+  - Normalize "Mileage"/"Odometer"/"Miles" → "Mileage"  
+  - Normalize "Vehicle ID"/"Vehicle Registration" → "VehicleRegistration"
+  - Store original extracted labels alongside normalized versions
+  - Support user feedback to improve normalization rules
+  - Log all normalization decisions for analysis and improvement
+  - Handle new/unseen field label variations gracefully
+  - Maintain mapping history for audit purposes
+
+#### FR-010: Semantic Field Normalization Enhancement
+- **Description**: Enhance field normalization with semantic similarity matching for unseen variations
+- **Acceptance Criteria**:
+  - Implement embedding-based semantic similarity model
+  - Handle new field label variations not in the dictionary
+  - Achieve 80% accuracy on field label normalization
+  - Support user corrections to improve semantic matching
+  - Store embeddings for efficient similarity calculations
+  - Provide confidence scores for semantic matches
+  - Support threshold-based fallback to manual review
+  - Enable continuous learning from user feedback
+
+#### FR-011: Unified Processing Pipeline
+- **Description**: Integrate normalization and classification into the core processing workflow
+- **Acceptance Criteria**:
+  - Execute field normalization immediately after Form Recognizer extraction
+  - Perform line item classification before database storage
+  - Maintain processing order: Extract → Normalize → Classify → Store
+  - Support modular architecture for easy classifier/normalizer updates
+  - Preserve original extracted data alongside processed versions
+  - Handle processing failures gracefully with partial results
+  - Support pipeline configuration and feature toggling
+  - Maintain processing metadata and audit trails
+
+#### FR-012: Feedback and Continuous Learning System
+- **Description**: Implement user feedback mechanisms to improve classification and normalization accuracy
+- **Acceptance Criteria**:
+  - Provide UI for users to correct line item classifications
+  - Enable users to update field label normalizations
+  - Store all user corrections with timestamps and user identification
+  - Implement feedback aggregation to identify common correction patterns
+  - Support periodic model retraining with accumulated feedback
+  - Provide feedback statistics and accuracy trend reporting
+  - Enable bulk correction capabilities for systematic issues
+  - Maintain feedback audit trail for compliance and analysis
 
 ### 3.2 Data Storage Module
 
-#### FR-005: Database Storage
-- **Description**: Store structured invoice data in Azure SQL Database using normalized table structure
+#### FR-013: Database Storage
+- **Description**: Store structured invoice data in Azure SQL Database using normalized table structure with classification and normalization results
 - **Acceptance Criteria**:
   - Map extracted header information to InvoiceHeader table
   - Map all detail lines (parts, labor, services) to InvoiceLines table
+  - Store line item classifications (Part/Labor) with confidence scores
+  - Store field label normalizations (original and normalized versions)
+  - Store user feedback and corrections for continuous learning
   - Maintain foreign key relationships between header and lines
   - Store processing metadata and confidence scores
   - Maintain data integrity with transactions
   - Record processing timestamps
 
-#### FR-006: File Archival
+#### FR-014: File Archival
 - **Description**: Store original files in Azure Blob Storage
 - **Acceptance Criteria**:
   - Store all files in a single container
@@ -111,7 +241,7 @@ The system processes vehicle maintenance invoices through the following workflow
   - Maintain file metadata
   - Provide secure access URLs
 
-#### FR-007: Original File Access
+#### FR-015: Original File Access
 - **Description**: Provide user interface and API access to original invoice files stored in blob storage
 - **Acceptance Criteria**:
   - Display "View Original" button/link on invoice details pages
@@ -124,7 +254,7 @@ The system processes vehicle maintenance invoices through the following workflow
 
 ### 3.3 API Module
 
-#### FR-008: RESTful API
+#### FR-016: RESTful API
 - **Description**: Provide RESTful endpoints for data access
 - **Acceptance Criteria**:
   - Return JSON responses
@@ -134,19 +264,21 @@ The system processes vehicle maintenance invoices through the following workflow
 
 ### 3.4 User Interface Module
 
-#### FR-009: Invoice Details View
-- **Description**: Provide comprehensive invoice details page with original file access
+#### FR-017: Invoice Details View
+- **Description**: Provide comprehensive invoice details page with original file access and classification feedback
 - **Acceptance Criteria**:
   - Display all invoice header information in readable format
-  - Show line items in organized table format
+  - Show line items in organized table format with Part/Labor classifications
   - Include "View Original File" button/link prominently displayed
   - Support in-browser PDF viewing for compatible browsers
   - Support in-browser image viewing for PNG files
   - Provide "Download Original" option as fallback
   - Display file metadata (filename, size, upload date)
   - Show loading indicators during file access operations
+  - Enable users to correct line item classifications with feedback buttons
+  - Display confidence scores for classifications and normalizations
 
-#### FR-010: File Access Security
+#### FR-018: File Access Security
 - **Description**: Implement secure access controls for original invoice files
 - **Acceptance Criteria**:
   - Generate time-limited SAS (Shared Access Signature) URLs for blob access
@@ -155,8 +287,8 @@ The system processes vehicle maintenance invoices through the following workflow
   - Prevent direct blob URL exposure in client-side code
   - Handle expired link scenarios gracefully with user-friendly messages
 
-#### FR-014: Enhanced Invoice Details UI
-- **Description**: Update invoice details page to support approval workflow
+#### FR-019: Enhanced Invoice Details UI
+- **Description**: Update invoice details page to support approval workflow and feedback collection
 - **Acceptance Criteria**:
   - Display approval status badge prominently at the top of invoice details
   - Show "Pending Approval" badge in yellow/orange for unapproved invoices
@@ -168,8 +300,9 @@ The system processes vehicle maintenance invoices through the following workflow
   - Disable/hide approval buttons for already approved invoices
   - Maintain existing "View Original File" functionality
   - Responsive design for mobile and desktop viewing
+  - Add "Correct Classification" buttons next to line items for feedback collection
 
-#### FR-015: Confirmation Dialog System
+#### FR-020: Confirmation Dialog System
 - **Description**: Implement user-friendly confirmation dialogs for critical actions
 - **Acceptance Criteria**:
   - **Approve Confirmation**:
@@ -189,7 +322,7 @@ The system processes vehicle maintenance invoices through the following workflow
 
 ### 3.5 Invoice Approval Module
 
-#### FR-011: Invoice Approval Process
+#### FR-021: Invoice Approval Process
 - **Description**: Provide approval workflow for processed invoices with database status tracking
 - **Acceptance Criteria**:
   - Display "Approve" button on invoice details page for unapproved invoices
@@ -200,7 +333,7 @@ The system processes vehicle maintenance invoices through the following workflow
   - Only show "Approve" button for invoices with `Approved = false`
   - Track approval timestamp and user information
 
-#### FR-012: Invoice Rejection Process
+#### FR-022: Invoice Rejection Process
 - **Description**: Provide rejection workflow that removes rejected invoices and files completely
 - **Acceptance Criteria**:
   - Display "Reject" button on invoice details page for unapproved invoices
@@ -215,7 +348,7 @@ The system processes vehicle maintenance invoices through the following workflow
   - Log all rejection actions for audit purposes
   - Only show "Reject" button for invoices with `Approved = false`
 
-#### FR-013: Approval Status Management
+#### FR-023: Approval Status Management
 - **Description**: Manage invoice approval states and user interface updates
 - **Acceptance Criteria**:
   - Add `Approved` boolean column to InvoiceHeader table with default value `false`
@@ -225,40 +358,30 @@ The system processes vehicle maintenance invoices through the following workflow
   - Include approval status in API responses
   - Add approval status filter to invoice list views
 
+---
+
+## 4. API Specification
+
 ### Base URL
 ```
 https://[app-name].azurewebsites.net/api
 ```
 
-### Endpoints
+### Core Invoice Endpoints
 
 #### GET /invoices
-- **Purpose**: Retrieve all invoices with pagination
+- **Purpose**: Retrieve all invoices with pagination and enhanced filtering
 - **Parameters**: 
   - `page` (optional): Page number (default: 1)
   - `pageSize` (optional): Items per page (default: 20, max: 100)
-- **Response**: Paginated list of invoice headers
+  - `classification` (optional): Filter by line item classification status
+  - `approvalStatus` (optional): Filter by approval status
+- **Response**: Paginated list of invoice headers with classification metadata
 
 #### GET /invoices/{id}
-- **Purpose**: Retrieve specific invoice with line items
+- **Purpose**: Retrieve specific invoice with line items and classification data
 - **Parameters**: `id` (required): Invoice ID
-- **Response**: Complete invoice details including line items
-
-#### GET /invoices/vehicle/{vehicleId}
-- **Purpose**: Search invoices by vehicle ID
-- **Parameters**: 
-  - `vehicleId` (required): Vehicle identifier
-  - `page` (optional): Page number
-  - `pageSize` (optional): Items per page
-- **Response**: Filtered invoice list
-
-#### GET /invoices/date/{date}
-- **Purpose**: Retrieve invoices by creation date
-- **Parameters**: 
-  - `date` (required): Date in YYYY-MM-DD format
-  - `page` (optional): Page number
-  - `pageSize` (optional): Items per page
-- **Response**: Date-filtered invoice list
+- **Response**: Complete invoice details including line items with Part/Labor classifications, confidence scores, and normalization results
 
 #### POST /invoices/upload
 - **Purpose**: Upload and process new invoice
@@ -283,7 +406,24 @@ https://[app-name].azurewebsites.net/api
 - **Parameters**: `id` (required): Invoice ID
 - **Response**: Secure redirect to blob storage URL or file stream
 - **Security**: Time-limited access URL with 1-hour expiration
-- **Content-Type**: Preserves original file MIME type (application/pdf or image/png)
+
+### Classification and Feedback Endpoints
+
+#### POST /invoices/{id}/lines/{lineId}/feedback
+- **Purpose**: Submit user feedback for line item classification correction
+- **Parameters**: 
+  - `id` (required): Invoice ID
+  - `lineId` (required): Invoice line item ID
+- **Body**: JSON with corrected classification and user information
+- **Response**: Confirmation of feedback submission and updated line item data
+
+#### GET /classifications/accuracy
+- **Purpose**: Retrieve classification accuracy metrics and trends
+- **Parameters**: 
+  - `dateFrom` (optional): Start date for metrics
+  - `dateTo` (optional): End date for metrics
+  - `classifierType` (optional): Filter by classification type
+- **Response**: Accuracy statistics, confidence distributions, and improvement trends
 
 ---
 
@@ -291,7 +431,8 @@ https://[app-name].azurewebsites.net/api
 
 ### Performance
 - **Response Time**: API responses < 2 seconds
-- **Processing Time**: Invoice processing < 30 seconds
+- **Processing Time**: Invoice processing < 30 seconds (including classification and normalization)
+- **Classification Time**: Line item classification < 5 seconds per invoice
 - **Throughput**: Support 100 concurrent users
 - **File Processing**: Handle up to 1000 invoices/day
 
@@ -312,7 +453,12 @@ https://[app-name].azurewebsites.net/api
 - **Horizontal Scaling**: Azure App Service auto-scaling
 - **Database Scaling**: Azure SQL elastic pools
 - **Storage**: Unlimited blob storage capacity
-- **CDN**: Azure CDN for static content delivery
+
+### Data Extraction Accuracy
+- **Numeric Field Extraction**: 95% accuracy for all numeric fields including comma-formatted numbers
+- **Text Field Extraction**: 95% accuracy for standard text fields
+- **Field Format Handling**: Support multiple formatting conventions without manual configuration
+- **Error Recovery**: Graceful handling of unexpected data formats with fallback mechanisms
 
 ---
 
@@ -337,35 +483,38 @@ Internet → Azure App Service → Azure SQL Database
 
 ## 7. Database Schema
 
-### Table Structure Overview
-The system uses a normalized two-table structure to store invoice data:
-
 ### InvoiceHeader Table
 Stores one record per invoice with summary information extracted from invoice header.
 
-| Column | Type | Constraints | Maps From |
-|--------|------|-------------|-----------|
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
 | InvoiceID | INT IDENTITY | PRIMARY KEY | Auto-generated |
-| VehicleID | NVARCHAR(50) | NOT NULL | Vehicle identifier on invoice |
-| Odometer | INT | NULL | Mileage reading from invoice |
-| InvoiceNumber | NVARCHAR(50) | NOT NULL, UNIQUE | Invoice number from header |
+| VehicleID | NVARCHAR(50) | NOT NULL | Vehicle identifier on invoice (normalized) |
+| OriginalVehicleLabel | NVARCHAR(100) | NULL | Original extracted vehicle field label |
+| Odometer | INT | NULL | Mileage reading from invoice (supports comma-separated format) |
+| OriginalOdometerLabel | NVARCHAR(100) | NULL | Original extracted odometer field label |
+| OriginalOdometerText | NVARCHAR(50) | NULL | Original extracted odometer text (e.g., "67,890") |
+| InvoiceNumber | NVARCHAR(50) | NOT NULL, UNIQUE | Invoice number from header (normalized) |
+| OriginalInvoiceLabel | NVARCHAR(100) | NULL | Original extracted invoice field label |
 | InvoiceDate | DATE | NOT NULL | Service/invoice date |
 | TotalCost | DECIMAL(18,2) | NOT NULL | Grand total from invoice |
 | TotalPartsCost | DECIMAL(18,2) | NOT NULL | Calculated sum of parts lines |
 | TotalLaborCost | DECIMAL(18,2) | NOT NULL | Calculated sum of labor lines |
-| BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL (used for generating secure access links) |
-| Approved | BIT | NOT NULL, DEFAULT 0 | Approval status (false=pending, true=approved) |
+| BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL |
+| Approved | BIT | NOT NULL, DEFAULT 0 | Approval status |
 | ApprovedAt | DATETIME2 | NULL | Timestamp when invoice was approved |
 | ApprovedBy | NVARCHAR(100) | NULL | User who approved the invoice |
 | ExtractedData | NVARCHAR(MAX) | NULL | Raw JSON of extracted data |
 | ConfidenceScore | DECIMAL(5,2) | NULL | Overall extraction confidence |
+| NormalizationVersion | NVARCHAR(20) | NULL | Version of normalization rules applied |
+| NumericParsingVersion | NVARCHAR(20) | NULL | Version of numeric parsing logic applied |
 | CreatedAt | DATETIME | DEFAULT GETDATE() | Record creation time |
 
 ### InvoiceLines Table
-Stores multiple records per invoice - one for each line item (parts, labor, fees, etc.).
+Stores multiple records per invoice - one for each line item with classification results.
 
-| Column | Type | Constraints | Maps From |
-|--------|------|-------------|-----------|
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
 | LineID | INT IDENTITY | PRIMARY KEY | Auto-generated |
 | InvoiceID | INT | FOREIGN KEY | Links to InvoiceHeader |
 | LineNumber | INT | NOT NULL | Sequential order in invoice |
@@ -373,347 +522,125 @@ Stores multiple records per invoice - one for each line item (parts, labor, fees
 | UnitCost | DECIMAL(18,2) | NOT NULL | Price per unit/hour |
 | Quantity | DECIMAL(10,2) | NOT NULL | Number of units/hours |
 | TotalLineCost | DECIMAL(18,2) | NOT NULL | Extended line total |
-| PartNumber | NVARCHAR(100) | NULL | Optional: Extracted part number if available separately from description |
+| PartNumber | NVARCHAR(100) | NULL | Extracted part number if available |
 | Category | NVARCHAR(100) | NULL | Parts, Labor, Tax, Fee, Service |
-| ConfidenceScore | DECIMAL(5,2) | NULL | Line extraction confidence |
+| ClassifiedCategory | NVARCHAR(50) | NOT NULL | Part or Labor (ML classification) |
+| ClassificationConfidence | DECIMAL(5,2) | NULL | ML classification confidence score |
+| ClassificationMethod | NVARCHAR(50) | NOT NULL | Rule-based, ML.NET, Azure-AI, Manual |
+| ClassificationVersion | NVARCHAR(20) | NULL | Version of classification model used |
+| OriginalCategory | NVARCHAR(100) | NULL | Original extracted category before classification |
+| ExtractionConfidence | DECIMAL(5,2) | NULL | Line extraction confidence from OCR |
 | CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time |
 
-### Data Relationship
-```
-InvoiceHeader (1) -----> (Many) InvoiceLines
-     │                        │
-     │                        ├── Parts lines
-     │                        ├── Labor lines  
-     │                        ├── Tax lines
-     │                        ├── Fee lines
-     │                        └── Service lines
-     │
-     └── Summary totals calculated from line items
-```
-
 ---
 
-## 8. Technical Implementation Notes
+## 8. Development Timeline (65 Working Days)
 
-### 8.1 Database Schema Changes
-The approval feature requires adding new columns to the existing `InvoiceHeader` table:
-
-```sql
--- Add approval columns to existing InvoiceHeader table
-ALTER TABLE InvoiceHeader 
-ADD Approved BIT NOT NULL DEFAULT 0,
-    ApprovedAt DATETIME2 NULL,
-    ApprovedBy NVARCHAR(100) NULL;
-
--- Create index for approval status queries
-CREATE NONCLUSTERED INDEX IX_InvoiceHeader_Approved 
-    ON InvoiceHeader (Approved);
-```
-
-### 8.2 API Implementation Notes
-- **Approval Endpoint**: `PUT /api/invoices/{id}/approve` should be idempotent
-- **Rejection Endpoint**: `DELETE /api/invoices/{id}/reject` must handle cascading deletions
-- **Transaction Management**: Rejection process requires database transaction to ensure atomicity
-- **Blob Deletion**: Must handle cases where blob file may already be deleted or inaccessible
-- **Error Handling**: Provide detailed error responses for partial failures
-
-### 8.3 Frontend Implementation Notes
-- **JavaScript Confirmation Dialogs**: Use modern modal dialogs instead of basic `confirm()`
-- **State Management**: Update UI state immediately after successful operations
-- **Loading States**: Show loading indicators during async operations
-- **Error Display**: Implement toast notifications or inline error messages
-- **Accessibility**: Ensure confirmation dialogs are screen reader accessible
-
-### 8.4 Security Considerations
-- **Authorization**: Implement proper authorization checks for approval/rejection actions
-- **Audit Logging**: Log all approval/rejection actions with user identification
-- **Input Validation**: Validate invoice ID and approval state before processing
-- **Rate Limiting**: Consider implementing rate limits on approval/rejection endpoints
-
----
-
-## 9. Multi-Vendor Invoice Format Strategy
-
-### Supported Invoice Variations
-
-#### Format Type 1: Separate Parts and Labor Sections
-- Parts listed in one table section
-- Labor listed in separate table section
-- Each section may have different column structures
-
-#### Format Type 2: Combined Line Items with Type Classification
-- Single table with mixed parts and labor
-- Type identified by description or category column
-- Unified column structure across line items
-
-#### Format Type 3: Service-Based Invoices
-- Labor and parts combined per service line
-- Each line represents a complete service (e.g., "Oil Change - includes filter and oil")
-- May require parsing descriptions to separate parts from labor costs
-
-### Azure Form Recognizer Implementation Strategy
-
-#### Phase 1: General Invoice Model
-- Use pre-built invoice model for basic structure detection
-- Extract common fields (totals, dates, vendor info)
-- Identify table regions for line item processing
-
-#### Phase 2: Custom Models by Vendor
-- Train vendor-specific models for improved accuracy
-- Handle unique layouts and terminology
-- Optimize for each vendor's specific format quirks
-
-#### Phase 3: Intelligent Classification
-- Automatically detect invoice format type
-- Route to appropriate extraction logic
-- Fall back to manual review for unknown formats
-
-### Data Mapping Strategy
-
-#### Invoice Header Extraction → InvoiceHeader Table
-| Extracted Field | Database Column | Description |
-|-----------------|-----------------|-------------|
-| Vehicle ID | VehicleID | Vehicle identifier from invoice |
-| Odometer Reading | Odometer | Mileage at time of service |
-| Invoice Number | InvoiceNumber | Unique invoice identifier |
-| Invoice Date | InvoiceDate | Date of service/invoice |
-| Total Amount | TotalCost | Grand total of invoice |
-| Parts Subtotal | TotalPartsCost | Sum of all parts costs |
-| Labor Subtotal | TotalLaborCost | Sum of all labor costs |
-| Original File | BlobFileUrl | URL to stored PDF/PNG |
-
-#### Invoice Line Items → InvoiceLines Table
-| Extracted Field | Database Column | Description |
-|-----------------|-----------------|-------------|
-| Line Description | Description | Part name, service description, etc. |
-| Unit Price | UnitCost | Price per unit/hour |
-| Quantity | Quantity | Number of parts or hours |
-| Line Total | TotalLineCost | Extended cost for this line |
-| Item Type | Category | Parts, Labor, Tax, Misc, etc. |
-| Line Number | LineNumber | Sequential order in invoice |
-
-#### Data Processing Flow
-```
-PDF/PNG Invoice
-        ↓
-Azure Form Recognizer Extraction
-        ↓
-┌─────────────────┬─────────────────┐
-│   Header Data   │   Line Items    │
-│                 │                 │
-│ • Vehicle ID    │ • Description   │
-│ • Invoice #     │ • Unit Cost     │
-│ • Date          │ • Quantity      │
-│ • Totals        │ • Line Total    │
-│                 │ • Category      │
-└─────────────────┴─────────────────┘
-        ↓                 ↓
-  InvoiceHeader      InvoiceLines
-     Table             Table
-        ↓                 ↓
-    One Record    Multiple Records
-                  (linked by InvoiceID)
-```
-
-#### Classification Rules
-1. **Parts Detection**: Keywords like "part", "filter", "oil", part numbers → Category = "Parts"
-2. **Labor Detection**: Keywords like "labor", "service", "diagnostic", hourly rates → Category = "Labor"
-3. **Tax/Fees**: Keywords like "tax", "fee", "disposal" → Category = "Tax"
-4. **Mixed Items**: Combined descriptions requiring parsing → Category = "Service"
-5. **Confidence Scoring**: Track extraction confidence per line item
-
-#### Part Number Handling Strategy
-Most vehicle maintenance invoices handle part numbers inconsistently:
-
-**Scenario 1: Part Number in Separate Column**
-```
-Description          | Part Number | Price
-Oil Filter          | AC-PF52     | $24.99
-```
-→ PartNumber field populated with "AC-PF52"
-
-**Scenario 2: Part Number in Description (Most Common)**
-```
-Description                    | Price
-Oil Filter - AC Delco PF52    | $24.99
-```
-→ PartNumber field remains NULL, full description stored in Description field
-
-**Scenario 3: No Part Number Available**
-```
-Description        | Price
-Standard Oil Filter| $24.99
-```
-→ PartNumber field remains NULL
-
-**Implementation Approach:**
-- PartNumber field is **optional** and may be NULL for most records
-- If Form Recognizer detects a separate part number column, populate PartNumber field
-- If no separate column exists, store complete description (including any embedded part numbers)
-- Do not attempt to parse part numbers from descriptions (too error-prone)
-
-#### Example Data Mapping
-
-**Sample Invoice Input:**
-```
-Vehicle: VEH-12345        Invoice: INV-2025-001
-Date: 2025-08-14         Total: $285.50
-
-Line Items:
-1. Oil Filter - AC Delco PF52    $24.99  x1  = $24.99
-2. 5W-30 Motor Oil (5 Quarts)    $34.99  x1  = $34.99
-3. Labor - Oil Change Service    $75.00  x2  = $150.00
-4. Shop Supplies                 $12.50  x1  = $12.50
-5. Environmental Disposal Fee    $8.00   x1  = $8.00
-6. Sales Tax                     $25.02  x1  = $25.02
-```
-
-**Database Output:**
-
-*InvoiceHeader Table:*
-```
-InvoiceID: 1001
-VehicleID: VEH-12345
-InvoiceNumber: INV-2025-001
-InvoiceDate: 2025-08-14
-TotalCost: 285.50
-TotalPartsCost: 59.98
-TotalLaborCost: 150.00
-```
-
-*InvoiceLines Table:*
-```
-LineID: 1, InvoiceID: 1001, LineNumber: 1, Description: "Oil Filter - AC Delco PF52", 
-UnitCost: 24.99, Quantity: 1, TotalLineCost: 24.99, Category: "Parts", PartNumber: NULL
-
-LineID: 2, InvoiceID: 1001, LineNumber: 2, Description: "5W-30 Motor Oil (5 Quarts)", 
-UnitCost: 34.99, Quantity: 1, TotalLineCost: 34.99, Category: "Parts", PartNumber: NULL
-
-LineID: 3, InvoiceID: 1001, LineNumber: 3, Description: "Labor - Oil Change Service", 
-UnitCost: 75.00, Quantity: 2, TotalLineCost: 150.00, Category: "Labor", PartNumber: NULL
-
-LineID: 4, InvoiceID: 1001, LineNumber: 4, Description: "Shop Supplies", 
-UnitCost: 12.50, Quantity: 1, TotalLineCost: 12.50, Category: "Supplies", PartNumber: NULL
-
-LineID: 5, InvoiceID: 1001, LineNumber: 5, Description: "Environmental Disposal Fee", 
-UnitCost: 8.00, Quantity: 1, TotalLineCost: 8.00, Category: "Fee", PartNumber: NULL
-
-LineID: 6, InvoiceID: 1001, LineNumber: 6, Description: "Sales Tax", 
-UnitCost: 25.02, Quantity: 1, TotalLineCost: 25.02, Category: "Tax", PartNumber: NULL
-```
-
-**Alternative Scenario - Invoice with Separate Part Number Column:**
-```
-Description     | Part Number | Price | Qty | Total
-Oil Filter      | AC-PF52     | 24.99 | 1   | 24.99
-Motor Oil       | VAL-120     | 34.99 | 1   | 34.99
-```
-
-*Would result in:*
-```
-Description: "Oil Filter", PartNumber: "AC-PF52", Category: "Parts"
-Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
-```
-
----
-
-## 10. Development Timeline (20 Working Days)
-
-### Sprint 1: Foundation (Days 1-5)
-**Objectives**: Infrastructure setup and basic file handling
+### Phase 1: Foundation & Core Features (Days 1-20)
 - Azure resource provisioning
-- Database schema implementation (including approval columns)
+- Enhanced database schema implementation with numeric parsing support
 - Basic web application structure
 - File upload functionality
 - Blob storage integration
+- Azure Form Recognizer integration with robust numeric extraction
+- Data extraction pipeline with format-aware numeric parsing
+- API endpoints implementation
+- Invoice approval/rejection workflow
 
-### Sprint 2: Core Processing (Days 6-10)
-**Objectives**: OCR integration and data extraction
-- Azure Form Recognizer integration for multi-vendor support
-- Data extraction pipeline with format detection
-- Vendor-specific extraction logic
-- Database data access layer with approval status
-- Error handling and logging
-- Basic API endpoints
+### Phase 2: Intelligence Features - Rule-Based (Days 21-35)
+- Rule-based classification engine
+- Dictionary-based field normalization
+- User feedback collection system
+- Unified processing pipeline
+- End-to-end testing with various numeric formats
 
-### Sprint 3: API Development (Days 11-15)
-**Objectives**: Complete API implementation including approval workflow
-- All REST endpoints implementation (including approve/reject)
-- Approval/rejection business logic with cascading deletions
-- API documentation (Swagger)
-- Unit testing framework
-- Integration testing
-- Performance optimization
+### Phase 3: Machine Learning Enhancement (Days 36-50)
+- ML.NET text classification model
+- Model training and validation
+- A/B testing system
+- Batch reclassification capabilities
+- Classification accuracy monitoring
 
-### Sprint 4: UI Enhancement (Days 16-18)
-**Objectives**: Approval workflow user interface
-- Invoice details page updates with approval status
-- Approve/Reject buttons with confirmation dialogs
-- Success/error message handling
-- Responsive design updates
-- Frontend validation and state management
-
-### Sprint 5: Testing & Deployment (Days 19-20)
-**Objectives**: Production readiness
-- End-to-end testing including approval workflow
-- Load testing
-- Security testing
-- Production deployment
-- Documentation completion
+### Phase 4: Advanced Intelligence (Days 51-65)
+- Semantic similarity for field normalization
+- Azure OpenAI integration
+- Comprehensive monitoring dashboard
+- Performance analytics
+- System optimization
 
 ---
 
-## 11. Risk Assessment
+## 9. Success Criteria
+
+### Phase 1 (MVP - Core Features)
+- [ ] Process PDF and PNG invoices successfully
+- [ ] Extract header and line item data with 90%+ accuracy
+- [ ] **Extract numeric fields with 95% accuracy across all formats (standard and comma-separated)**
+- [ ] **Extract part numbers from invoice line items with 90% accuracy when present**
+- [ ] Handle at least 3 different vendor invoice formats
+- [ ] Store data in Azure SQL Database with enhanced schema including part numbers
+- [ ] Provide basic API endpoints
+- [ ] Deploy to Azure App Service
+- [ ] Implement secure original file access functionality
+- [ ] Implement invoice approval/rejection workflow
+- [ ] Add approval status tracking
+- [ ] Provide confirmation dialogs for all approval/rejection actions
+
+### Phase 2 (Intelligence Features)
+- [ ] Implement rule-based line item classification
+- [ ] Achieve 75% accuracy on line item classification
+- [ ] Implement field label normalization
+- [ ] Store original labels alongside normalized versions
+- [ ] Display classification results with confidence scores
+- [ ] Implement user feedback collection
+
+### Phase 3 (Machine Learning Enhancement)
+- [ ] Implement ML.NET text classification model
+- [ ] Achieve 85% accuracy on line item classification
+- [ ] Implement semantic similarity matching
+- [ ] Support model versioning and rollback
+- [ ] Implement A/B testing framework
+
+### Phase 4 (Continuous Learning)
+- [ ] Implement automated model retraining
+- [ ] Achieve 90% accuracy on line item classification
+- [ ] Create accuracy tracking dashboard
+- [ ] Implement confidence-based manual review workflows
+
+---
+
+## 10. Risk Assessment
 
 ### High Priority Risks
 1. **Vendor Format Variability**: Different vendors may have significantly different invoice layouts
-   - *Mitigation*: Implement Azure Form Recognizer custom models per vendor and confidence-based manual review
-
+   - *Mitigation*: Implement Azure Form Recognizer custom models per vendor
 2. **OCR Accuracy**: Variable invoice formats may impact extraction accuracy
-   - *Mitigation*: Use Azure Form Recognizer's adaptive learning and implement manual review workflow
-
-3. **Azure Service Limits**: Form Recognizer API rate limits and costs
-   - *Mitigation*: Implement queuing system, rate limiting, and cost monitoring
-
-3. **Data Privacy**: Sensitive financial information handling
+   - *Mitigation*: Use Azure Form Recognizer's adaptive learning
+3. **Numeric Format Variations**: Invoices may use different numeric formatting conventions
+   - *Mitigation*: Implement comprehensive regex patterns and parsing logic for multiple formats
+4. **Azure Service Limits**: Form Recognizer API rate limits and costs
+   - *Mitigation*: Implement queuing system and cost monitoring
+5. **Data Privacy**: Sensitive financial information handling
    - *Mitigation*: Implement encryption at rest and in transit
-
-### Medium Priority Risks
-1. **Performance**: Large file processing times
-   - *Mitigation*: Implement async processing and progress tracking
-
-2. **Integration**: External system compatibility
-   - *Mitigation*: Comprehensive API documentation and testing
 
 ---
 
-## 11. Success Criteria
+## 11. Quality Assurance and Testing
 
-### Phase 1 (MVP)
-- [ ] Process PDF and PNG invoices successfully
-- [ ] Extract header and line item data with 90%+ accuracy
-- [ ] Handle at least 3 different vendor invoice formats
-- [ ] Classify line items as Parts, Labor, or Mixed
-- [ ] Store data in Azure SQL Database
-- [ ] Provide basic API endpoints
-- [ ] Deploy to Azure App Service
-- [ ] Implement secure original file access (view/download functionality)
-- [ ] Display "View Original File" buttons on invoice details pages
-- [ ] **NEW: Implement invoice approval/rejection workflow**
-- [ ] **NEW: Add approval status tracking with database column**
-- [ ] **NEW: Provide confirmation dialogs for all approval/rejection actions**
-- [ ] **NEW: Implement complete invoice deletion on rejection (blob + database)**
+### Test Coverage Requirements
+- **Unit Tests**: 90% code coverage for data extraction and parsing logic
+- **Integration Tests**: End-to-end invoice processing with various formats
+- **Regression Tests**: Automated tests for numeric parsing edge cases
+- **Performance Tests**: Load testing with 1000+ invoices
+- **Security Tests**: Vulnerability scanning and penetration testing
 
-### Phase 2 (Enhancement)
-- [ ] Implement vendor-specific custom models
-- [ ] Add batch processing capabilities
-- [ ] Enhance format detection and classification
-- [ ] Add comprehensive monitoring and alerts
-- [ ] Implement audit logging for approval/rejection actions
-- [ ] Support additional vendor formats
-- [ ] **NEW: Add bulk approval/rejection capabilities**
-- [ ] **NEW: Implement approval workflow with multiple approval levels**
-- [ ] **NEW: Add approval history and audit trail**
+### Numeric Extraction Test Cases
+- Standard integers (e.g., "67890", "123456")
+- Comma-separated numbers (e.g., "67,890", "123,456", "1,234,567")
+- Numbers with leading/trailing spaces
+- Invalid formats and edge cases
+- Mixed format invoices
+- Currency values with various formatting
 
 ---
 
@@ -723,10 +650,22 @@ Description: "Motor Oil", PartNumber: "VAL-120", Category: "Parts"
 - **OCR**: Optical Character Recognition
 - **API**: Application Programming Interface
 - **MVP**: Minimum Viable Product
-- **SLA**: Service Level Agreement
+- **ML**: Machine Learning
+- **Field Normalization**: Process of standardizing inconsistent field labels
+- **Line Item Classification**: Process of categorizing invoice line items as Parts or Labor
+- **Confidence Score**: Numerical score indicating system's certainty in classification
+- **Comma-Separated Numbers**: Numeric format using commas as thousand separators (e.g., "1,234,567")
 
 ### B. References
 - Azure Form Recognizer Documentation
 - Azure SQL Database Best Practices
 - ASP.NET Core API Guidelines
 - Azure App Service Deployment Guide
+- ML.NET Text Classification Documentation
+- Regular Expression Patterns for Numeric Data
+
+### C. Technical Implementation Notes
+- **Regex Pattern for Comma-Separated Numbers**: `\d{1,3}(?:,\d{3})+`
+- **Fallback Logic**: Always attempt standard integer parsing if comma-separated parsing fails
+- **Audit Trail**: Maintain original extracted text alongside parsed values
+- **Performance**: Numeric parsing should not add more than 100ms to total processing time

@@ -308,4 +308,33 @@ public class InvoicesController : ControllerBase
             return StatusCode(500, "An error occurred while rejecting the invoice");
         }
     }
+
+    /// <summary>
+    /// Debug endpoint to examine raw ExtractedData for an invoice
+    /// </summary>
+    /// <param name="id">Invoice ID</param>
+    /// <returns>Raw Form Recognizer data</returns>
+    [HttpGet("{id:int}/debug")]
+    [ProducesResponseType(typeof(object), 200)]
+    [ProducesResponseType(typeof(string), 404)]
+    [ProducesResponseType(typeof(string), 500)]
+    public async Task<IActionResult> GetInvoiceDebugData(int id)
+    {
+        try
+        {
+            var debugData = await _invoiceService.GetRawExtractedDataAsync(id);
+            
+            if (debugData == null)
+            {
+                return NotFound($"Invoice with ID {id} not found");
+            }
+
+            return Ok(debugData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving debug data for invoice {InvoiceId}", id);
+            return StatusCode(500, "An error occurred while retrieving debug data");
+        }
+    }
 }

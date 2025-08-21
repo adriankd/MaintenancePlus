@@ -18,6 +18,7 @@ public interface IInvoiceProcessingService
     Task<string> GetSecureFileUrlAsync(int invoiceId, string? userIdentifier = null);
     Task<InvoiceActionResponse> ApproveInvoiceAsync(int invoiceId, string approvedBy);
     Task<InvoiceActionResponse> RejectInvoiceAsync(int invoiceId);
+    Task<object?> GetRawExtractedDataAsync(int invoiceId);
 }
 
 /// <summary>
@@ -302,7 +303,7 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                         Quantity = l.Quantity,
                         TotalLineCost = l.TotalLineCost,
                         PartNumber = l.PartNumber,
-                        Category = l.ClassifiedCategory ?? l.Category,
+                        Category = l.ClassifiedCategory != "Unclassified" ? l.ClassifiedCategory : l.Category,
                         ClassifiedCategory = l.ClassifiedCategory,
                         ClassificationConfidence = l.ClassificationConfidence,
                         ConfidenceScore = l.ExtractionConfidence
@@ -711,6 +712,28 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             ExtractionConfidence = data.ConfidenceScore,
             CreatedAt = DateTime.Now
         };
+    }
+
+    public async Task<object?> GetRawExtractedDataAsync(int invoiceId)
+    {
+        try
+        {
+            var invoice = await _context.InvoiceHeaders
+                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+
+            if (invoice?.ExtractedData == null)
+            {
+                return null;
+            }
+
+            // Parse and return the raw JSON data
+            return JsonSerializer.Deserialize<object>(invoice.ExtractedData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving raw data for invoice {InvoiceId}", invoiceId);
+            return null;
+        }
     }
 }
 
