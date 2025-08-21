@@ -508,6 +508,8 @@ Internet → Azure App Service → Azure SQL Database
 
 ## 7. Database Schema
 
+**Note**: All timestamp columns use DATETIME2 with GETUTCDATE() defaults to ensure consistent UTC time storage across the system.
+
 ### InvoiceHeader Table
 Stores one record per invoice with summary information extracted from invoice header.
 
@@ -527,13 +529,13 @@ Stores one record per invoice with summary information extracted from invoice he
 | TotalLaborCost | DECIMAL(18,2) | NOT NULL | Calculated sum of labor lines |
 | BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL |
 | Approved | BIT | NOT NULL, DEFAULT 0 | Approval status |
-| ApprovedAt | DATETIME2 | NULL | Timestamp when invoice was approved |
+| ApprovedAt | DATETIME2 | NULL | Timestamp when invoice was approved (UTC) |
 | ApprovedBy | NVARCHAR(100) | NULL | User who approved the invoice |
 | ExtractedData | NVARCHAR(MAX) | NULL | Raw JSON of extracted data |
 | ConfidenceScore | DECIMAL(5,2) | NULL | Overall extraction confidence |
 | NormalizationVersion | NVARCHAR(20) | NULL | Version of normalization rules applied |
 | NumericParsingVersion | NVARCHAR(20) | NULL | Version of numeric parsing logic applied |
-| CreatedAt | DATETIME | DEFAULT GETDATE() | Record creation time |
+| CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time (UTC) |
 
 ### InvoiceLines Table
 Stores multiple records per invoice - one for each line item with classification results.
@@ -555,7 +557,7 @@ Stores multiple records per invoice - one for each line item with classification
 | ClassificationVersion | NVARCHAR(20) | NULL | Version of classification model used |
 | OriginalCategory | NVARCHAR(100) | NULL | Original extracted category before classification |
 | ExtractionConfidence | DECIMAL(5,2) | NULL | Line extraction confidence from OCR |
-| CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time |
+| CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time (UTC) |
 
 ---
 

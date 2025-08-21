@@ -75,6 +75,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
             if (!ocrResult.Success || ocrResult.InvoiceData == null)
             {
+                // Clean up uploaded blob since OCR processing failed
+                await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "OCR failure");
+                
                 response.Success = false;
                 response.Message = "OCR processing failed";
                 response.Errors.Add($"Form Recognizer error: {ocrResult.ErrorMessage}");
@@ -87,6 +90,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
             var validationResult = ValidateInvoiceData(ocrResult.InvoiceData);
             if (!validationResult.IsValid)
             {
+                // Clean up uploaded blob since data validation failed
+                await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "validation failure");
+                
                 response.Success = false;
                 response.Message = "Data validation failed";
                 response.Errors.AddRange(validationResult.Errors);
@@ -120,6 +126,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                         innerMessage.Contains("duplicate") && innerMessage.Contains("InvoiceNumber"))
                     {
                         // Race condition: another request created an invoice with the same number
+                        // Clean up the uploaded blob file to prevent storage leak
+                        await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "duplicate invoice detection");
+                        
                         response.Success = false;
                         response.Message = $"Invoice number '{invoiceHeader.InvoiceNumber}' already exists";
                         response.Errors.Add($"Duplicate invoice number detected: {invoiceHeader.InvoiceNumber}");
@@ -129,7 +138,9 @@ public class InvoiceProcessingService : IInvoiceProcessingService
                     }
                     else
                     {
-                        // Other database constraint violations
+                        // Other database constraint violations - clean up blob before rethrowing
+                        await CleanupBlobFileAsync(uploadResult.BlobUrl ?? string.Empty, "database constraint violation");
+                        
                         response.Success = false;
                         response.Message = "Database constraint violation occurred";
                         response.Errors.Add($"Database error: {ex.Message}");
@@ -765,6 +776,35 @@ public class InvoiceProcessingService : IInvoiceProcessingService
         {
             _logger.LogError(ex, "Error retrieving raw data for invoice {InvoiceId}", invoiceId);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Helper method to clean up uploaded blob file in case of processing failure
+    /// </summary>
+    private async Task CleanupBlobFileAsync(string blobUrl, string reason)
+    {
+        if (string.IsNullOrEmpty(blobUrl))
+            return;
+
+        try
+        {
+            var uri = new Uri(blobUrl);
+            var blobFileName = uri.Segments.Last();
+            
+            var deletionSuccess = await _blobStorageService.DeleteFileAsync(blobFileName);
+            if (deletionSuccess)
+            {
+                _logger.LogInformation("Successfully cleaned up blob file after {Reason}: {BlobFileName}", reason, blobFileName);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to delete blob file after {Reason}: {BlobFileName}", reason, blobFileName);
+            }
+        }
+        catch (Exception blobEx)
+        {
+            _logger.LogError(blobEx, "Error during blob cleanup after {Reason}: {BlobUrl}", reason, blobUrl);
         }
     }
 }
