@@ -183,7 +183,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
                 PartNumber = l.PartNumber,
                 Category = l.Category,
                 ConfidenceScore = l.ConfidenceScore
-            }).ToList()
+            }).OrderBy(l => l.LineNumber).ToList()
         })
         .ToListAsync();
 
@@ -285,7 +285,8 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
 
 public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20)
 {
-    pageSize = Math.Min(pageSize, 100); // Limit page size
+    page = Math.Max(page, 1); // Ensure page >= 1
+    pageSize = Math.Clamp(pageSize, 1, 100); // Enforce [1,100]
     var skip = (page - 1) * pageSize;
 
     var query = _context.InvoiceHeaders
@@ -340,9 +341,10 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
 
 public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20)
 {
-    pageSize = Math.Min(pageSize, 100); // Limit page size
+    page = Math.Max(1, page);
+    pageSize = Math.Clamp(pageSize, 1, 100); // Enforce [1,100]
     var skip = (page - 1) * pageSize;
-
+    
     // Create date range for the entire day
     var startOfDay = date.Date;
     var endOfDay = startOfDay.AddDays(1);
