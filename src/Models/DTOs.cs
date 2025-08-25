@@ -89,6 +89,7 @@ public class InvoiceSummaryDto
     public DateTime? ApprovedAt { get; set; }
     public string? ApprovedBy { get; set; }
     public int LineItemCount { get; set; }
+    public List<InvoiceLineDto> LineItems { get; set; } = new(); // Added this line
 }
 
 /// <summary>
