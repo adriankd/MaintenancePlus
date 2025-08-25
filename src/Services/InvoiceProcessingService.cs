@@ -172,7 +172,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
             ApprovedAt = i.ApprovedAt,
             ApprovedBy = i.ApprovedBy,
             LineItemCount = i.InvoiceLines.Count(),
-            LineItems = i.InvoiceLines.Select(l => new InvoiceLineDto
+            LineItems = i.InvoiceLines.OrderBy(l => l.LineNumber).Select(l => new InvoiceLineDto
             {
                 LineID = l.LineID,
                 LineNumber = l.LineNumber,
@@ -315,18 +315,22 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
             ApprovedAt = i.ApprovedAt,
             ApprovedBy = i.ApprovedBy,
             LineItemCount = i.InvoiceLines.Count(),
-            LineItems = i.InvoiceLines.Select(l => new InvoiceLineDto
-            {
-                LineID = l.LineID,
-                LineNumber = l.LineNumber,
-                Description = l.Description,
-                UnitCost = l.UnitCost,
-                Quantity = l.Quantity,
-                TotalLineCost = l.TotalLineCost,
-                PartNumber = l.PartNumber,
-                Category = l.Category,
-                ConfidenceScore = l.ConfidenceScore
-            }).OrderBy(l => l.LineNumber).ToList()
+
+            LineItems = i.InvoiceLines
+                .OrderBy(l => l.LineNumber)
+                .Select(l => new InvoiceLineDto
+                {
+                    LineID = l.LineID,
+                    LineNumber = l.LineNumber,
+                    Description = l.Description,
+                    UnitCost = l.UnitCost,
+                    Quantity = l.Quantity,
+                    TotalLineCost = l.TotalLineCost,
+                    PartNumber = l.PartNumber,
+                    Category = l.Category,
+                    ConfidenceScore = l.ConfidenceScore
+                })
+                .ToList()
         })
         .ToListAsync();
 
@@ -375,18 +379,22 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
             ApprovedAt = i.ApprovedAt,
             ApprovedBy = i.ApprovedBy,
             LineItemCount = i.InvoiceLines.Count(),
-            LineItems = i.InvoiceLines.Select(l => new InvoiceLineDto
-            {
-                LineID = l.LineID,
-                LineNumber = l.LineNumber,
-                Description = l.Description,
-                UnitCost = l.UnitCost,
-                Quantity = l.Quantity,
-                TotalLineCost = l.TotalLineCost,
-                PartNumber = l.PartNumber,
-                Category = l.Category,
-                ConfidenceScore = l.ConfidenceScore
-            }).OrderBy(l => l.LineNumber).ToList()
+
+            LineItems = i.InvoiceLines
+                .OrderBy(l => l.LineNumber)
+                .Select(l => new InvoiceLineDto
+                {
+                    LineID = l.LineID,
+                    LineNumber = l.LineNumber,
+                    Description = l.Description,
+                    UnitCost = l.UnitCost,
+                    Quantity = l.Quantity,
+                    TotalLineCost = l.TotalLineCost,
+                    PartNumber = l.PartNumber,
+                    Category = l.Category,
+                    ConfidenceScore = l.ConfidenceScore
+                })
+                .ToList()
         })
         .ToListAsync();
 
