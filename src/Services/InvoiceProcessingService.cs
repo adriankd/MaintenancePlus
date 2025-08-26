@@ -144,11 +144,11 @@ public class InvoiceProcessingService : IInvoiceProcessingService
 
 public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page = 1, int pageSize = 20)
 {
-    pageSize = Math.Min(pageSize, 100); // Limit page size
+    pageSize =  Math.Clamp(pageSize, 1, 100); // Limit page size
+    page = Math.Max(page, 1);
     var skip = (page - 1) * pageSize;
 
-    var query = _context.InvoiceHeaders
-        .Include(i => i.InvoiceLines) // Include line items
+    var query = _context.InvoiceHeaders        
         .AsNoTracking()
         .OrderByDescending(i => i.CreatedAt);
 
@@ -289,8 +289,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
     pageSize = Math.Clamp(pageSize, 1, 100); // Enforce [1,100]
     var skip = (page - 1) * pageSize;
 
-    var query = _context.InvoiceHeaders
-        .Include(i => i.InvoiceLines) // Include line items
+    var query = _context.InvoiceHeaders        
         .AsNoTracking()
         .Where(i => i.VehicleID == vehicleId)
         .OrderByDescending(i => i.CreatedAt);
@@ -353,8 +352,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
     var startOfDay = date.Date;
     var endOfDay = startOfDay.AddDays(1);
 
-    var query = _context.InvoiceHeaders
-        .Include(i => i.InvoiceLines) // Include line items
+    var query = _context.InvoiceHeaders       
         .AsNoTracking()
         .Where(i => i.InvoiceDate >= startOfDay && i.InvoiceDate < endOfDay)
         .OrderByDescending(i => i.CreatedAt);
