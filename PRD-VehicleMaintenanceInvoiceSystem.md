@@ -574,6 +574,26 @@ https://[app-name].azurewebsites.net/api
 - **Parameters**: `id` (required): Invoice ID
 - **Response**: Complete invoice details including line items with Part/Labor classifications, confidence scores, and normalization results
 
+
+#### GET /invoices/date/{date}
+- **Purpose**: Retrieve invoices by invoice date
+- **Parameters**: 
+  - date (required): Invoice date in YYYY-MM-DD format
+  - page (optional): Page number (default: 1)
+  - pageSize (optional): Items per page (default: 20, max: 100)
+- **Response**: Paginated list of invoices matching the specified invoice date
+- **Example**: /invoices/date/2025-08-26?page=1&pageSize=20
+
+#### GET /invoices/uploaded-date/{date}
+- **Purpose**: Retrieve invoices by upload date (CreatedAt date)
+- **Parameters**: 
+  - date (required): Upload date in YYYY-MM-DD format
+  - page (optional): Page number (default: 1)
+  - pageSize (optional): Items per page (default: 20, max: 100)
+- **Response**: Paginated list of invoices uploaded on the specified date
+- **Example**: /invoices/uploaded-date/2025-08-26?page=1&pageSize=20
+- **Use Case**: Track invoices by when they were uploaded to the system vs when they were originally dated
+
 #### POST /invoices/upload
 - **Purpose**: Upload and process new invoice
 - **Body**: Multipart form data with file
