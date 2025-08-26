@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using VehicleMaintenanceInvoiceSystem.Services;
 using VehicleMaintenanceInvoiceSystem.Data;
 using VehicleMaintenanceInvoiceSystem.Models;
+using VehicleMaintenanceInvoiceSystem.Attributes;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
 
@@ -13,6 +14,8 @@ namespace VehicleMaintenanceInvoiceSystem.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[LocalhostOnly]
+[ApiExplorerSettings(IgnoreApi = true)]
 public class IntelligenceController : ControllerBase
 {
     private readonly IInvoiceIntelligenceService _intelligenceService;
@@ -119,7 +122,7 @@ public class IntelligenceController : ControllerBase
             if (lineItem != null)
             {
                 lineItem.ClassifiedCategory = request.CorrectCategory;
-                lineItem.ClassificationConfidence = 100; // User correction is 100% confidence
+                lineItem.ClassificationConfidence = 1.0m; // User correction is 100% confidence (stored as 1.0)
                 lineItem.ClassificationMethod = "User Correction";
             }
 
@@ -330,7 +333,8 @@ public class IntelligenceController : ControllerBase
             if (line != null)
             {
                 line.ClassifiedCategory = classification.ClassifiedCategory;
-                line.ClassificationConfidence = classification.Confidence;
+                // Store confidence as decimal (RuleBasedClassifier returns values like 60, so convert to 0.60)
+                line.ClassificationConfidence = classification.Confidence / 100.0m;
                 line.ClassificationMethod = classification.Method;
                 line.ClassificationVersion = classification.Version;
             }

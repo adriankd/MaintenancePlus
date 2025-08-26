@@ -83,6 +83,7 @@ public class InvoiceSummaryDto
     public decimal TotalCost { get; set; }
     public decimal TotalPartsCost { get; set; }
     public decimal TotalLaborCost { get; set; }
+    public string? Description { get; set; }
     public decimal? ConfidenceScore { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool Approved { get; set; }
@@ -104,6 +105,7 @@ public class InvoiceDetailsDto
     public decimal TotalCost { get; set; }
     public decimal TotalPartsCost { get; set; }
     public decimal TotalLaborCost { get; set; }
+    public string? Description { get; set; }
     public string BlobFileUrl { get; set; } = string.Empty;
     public decimal? ConfidenceScore { get; set; }
     public DateTime CreatedAt { get; set; }

@@ -36,6 +36,11 @@ public class InvoiceHeader
     [Column(TypeName = "decimal(18,2)")]
     public decimal TotalLaborCost { get; set; }
 
+    /// <summary>
+    /// GPT-4o generated standardized summary of all line item descriptions
+    /// </summary>
+    public string? Description { get; set; }
+
     [Required]
     [StringLength(255)]
     public string BlobFileUrl { get; set; } = string.Empty;

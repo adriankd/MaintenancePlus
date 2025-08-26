@@ -34,12 +34,16 @@ builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<IFormRecognizerService, FormRecognizerService>();
 builder.Services.AddScoped<IInvoiceProcessingService, InvoiceProcessingService>();
 
-// Register Phase 2 Intelligence Services
+// Register new comprehensive processing services
+builder.Services.AddScoped<IComprehensiveProcessingService, ComprehensiveProcessingService>();
+builder.Services.AddScoped<IInvoiceFallbackService, InvoiceFallbackService>();
+
+// Register Intelligence services
 builder.Services.AddScoped<ILineItemClassifier, RuleBasedLineItemClassifier>();
 builder.Services.AddScoped<IFieldNormalizer, DictionaryBasedFieldNormalizer>();
 builder.Services.AddScoped<IInvoiceIntelligenceService, RuleBasedInvoiceIntelligenceService>();
 
-// Register Phase 3 LLM Enhancement Services (GitHub Models / GPT-4o)
+// Register GPT-4o service with HttpClient
 builder.Services.AddHttpClient<IGitHubModelsService, GitHubModelsService>();
 
 // Add API documentation
@@ -118,7 +122,7 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<InvoiceDbContext>();
     try
     {
-        context.Database.EnsureCreated();
+        context.Database.Migrate();
         Log.Information("Database initialized successfully");
     }
     catch (Exception ex)
