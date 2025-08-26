@@ -1,4 +1,4 @@
-# Pull Request Template for Vehicle Maintenance Invoice System
+# Pull Request Template for Maintenance Plus
 # This template will be used by CodeRabbit and team members for consistent PR reviews
 
 ## 📋 Description
