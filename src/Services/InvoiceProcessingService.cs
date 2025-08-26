@@ -263,6 +263,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
         {
             InvoiceID = i.InvoiceID,
             VehicleID = i.VehicleID,
+              Odometer = i.Odometer,
             InvoiceNumber = i.InvoiceNumber,
             InvoiceDate = i.InvoiceDate,
             TotalCost = i.TotalCost,
@@ -409,6 +410,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
         {
             InvoiceID = i.InvoiceID,
             VehicleID = i.VehicleID,
+              Odometer = i.Odometer,
             InvoiceNumber = i.InvoiceNumber,
             InvoiceDate = i.InvoiceDate,
             TotalCost = i.TotalCost,
@@ -472,6 +474,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
         {
             InvoiceID = i.InvoiceID,
             VehicleID = i.VehicleID,
+              Odometer = i.Odometer,
             InvoiceNumber = i.InvoiceNumber,
             InvoiceDate = i.InvoiceDate,
             TotalCost = i.TotalCost,
@@ -535,6 +538,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
             {
                 InvoiceID = i.InvoiceID,
                 VehicleID = i.VehicleID,
+              Odometer = i.Odometer,
                 InvoiceNumber = i.InvoiceNumber,
                 InvoiceDate = i.InvoiceDate,
                 TotalCost = i.TotalCost,

@@ -78,6 +78,7 @@ public class InvoiceSummaryDto
 {
     public int InvoiceID { get; set; }
     public string VehicleID { get; set; } = string.Empty;
+    public int? Odometer { get; set; }
     public string InvoiceNumber { get; set; } = string.Empty;
     public DateTime InvoiceDate { get; set; }
     public decimal TotalCost { get; set; }

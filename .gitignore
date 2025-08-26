@@ -439,3 +439,10 @@ pending
 
 # Large zip files in root
 deploy.zip
+
+# Test files
+TestInvoices/
+
+# Launch settings
+launchSettings.json
+src/Properties/launchSettings.json
