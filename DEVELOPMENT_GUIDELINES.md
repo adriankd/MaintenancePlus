@@ -1,8 +1,8 @@
-# Vehicle Maintenance Invoice System - Development Guidelines
+# Maintenance Plus - Development Guidelines
 # These guidelines help CodeRabbit and team members maintain code quality
 
 ## 🎯 Overview
-This document outlines coding standards, review criteria, and best practices specific to the Vehicle Maintenance Invoice System. It serves as a reference for both automated (CodeRabbit) and manual code reviews.
+This document outlines coding standards, review criteria, and best practices specific to the Maintenance Plus. It serves as a reference for both automated (CodeRabbit) and manual code reviews.
 
 ## 🏗️ Architecture Principles
 

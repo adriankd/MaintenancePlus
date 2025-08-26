@@ -4,7 +4,7 @@ using VehicleMaintenanceInvoiceSystem.Models;
 namespace VehicleMaintenanceInvoiceSystem.Data;
 
 /// <summary>
-/// Entity Framework DbContext for Vehicle Maintenance Invoice System
+/// Entity Framework DbContext for Maintenance Plus
 /// </summary>
 public class InvoiceDbContext : DbContext
 {

@@ -131,7 +131,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-Log.Information("Vehicle Maintenance Invoice System starting up...");
+Log.Information("Maintenance Plus starting up...");
 
 try
 {

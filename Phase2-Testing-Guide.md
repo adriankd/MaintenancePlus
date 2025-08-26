@@ -13,7 +13,7 @@ This guide shows you how to test the newly implemented Phase 2 intelligence feat
 
 **Step 1:** Open your browser and go to: `http://localhost:5001`
 
-**Step 2:** You should see the Vehicle Maintenance Invoice System homepage with existing invoices listed.
+**Step 2:** You should see the Maintenance Plus homepage with existing invoices listed.
 
 **Step 3:** Click on any invoice to view details. Look for:
 - Intelligence fields in the invoice header

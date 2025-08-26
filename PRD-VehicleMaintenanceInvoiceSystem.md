@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
-## Vehicle Maintenance Invoice Processing System
+## Maintenance Plus
 
 ### Document Information
-- **Product Name**: Vehicle Maintenance Invoice Processing System
+- **Product Name**: Maintenance Plus
 - **Version**: 2.0
 - **Date**: August 21, 2025
 - **Product Manager**: [To be assigned]
