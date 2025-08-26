@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace VehicleMaintenanceInvoiceSystem.Tests
@@ -8,6 +9,7 @@ namespace VehicleMaintenanceInvoiceSystem.Tests
     /// </summary>
     public class TestMileageFix
     {
+#if DEBUG && TEST_HARNESS
         public static void Main(string[] args)
         {
             Console.WriteLine("Testing Mileage Extraction Fix");
@@ -70,5 +72,6 @@ namespace VehicleMaintenanceInvoiceSystem.Tests
 
             return null;
         }
+#endif
     }
 }

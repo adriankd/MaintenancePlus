@@ -421,5 +421,21 @@ TestInvoices/**/*.html
 # Deploy directory (build artifacts) - should not be tracked
 src/deploy/
 
+# Azure/Kudu deployment artifacts (ephemeral files)
+# These are generated during deployments and should NEVER be committed
+app-logs/
+app-logs/**
+**/deployments/
+**/deployments/**
+status.xml
+status_complete.xml
+*.deployment
+deployment_*
+manifest
+log.log
+latest.json
+active
+pending
+
 # Large zip files in root
 deploy.zip

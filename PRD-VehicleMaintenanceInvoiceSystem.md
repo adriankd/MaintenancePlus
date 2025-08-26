@@ -21,6 +21,7 @@ Develop a cloud-native C# web application that automates the extraction and proc
 - **Scalability**: Leverage Azure cloud services for enterprise-scale deployment
 - **Compliance**: Maintain audit trails with original document storage
 - **Intelligence**: Automatically classify invoice line items and normalize field labels
+- **Standardization**: Generate consistent, professional maintenance summary descriptions
 - **Continuous Learning**: Implement feedback loops for improving classification accuracy over time
 
 ### Success Metrics
@@ -42,13 +43,14 @@ The system processes vehicle maintenance invoices through the following workflow
 2. **Extract**: Azure Form Recognizer extracts structured data from documents
 3. **Normalize**: Field labels are standardized using the Field Label Normalization engine
 4. **Classify**: Line items are automatically classified as "Part" or "Labor" using ML classification
-5. **Store**: Structured data saved to Azure SQL Database with normalized labels and classifications
-6. **Archive**: Original files stored in Azure Blob Storage with secure access
-7. **Review**: Users can view invoice details and approve or reject the processed invoice
-8. **Feedback**: Users can correct misclassifications to improve future accuracy
-9. **Approve/Reject**: Users can approve invoices for final acceptance or reject and delete them
-10. **Access**: RESTful API provides data access for external systems
-11. **View**: Users can view/download original invoice files through secure links
+5. **Summarize**: Generate standardized maintenance description summary of all line items using AI
+6. **Store**: Structured data saved to Azure SQL Database with normalized labels, classifications, and description summary
+7. **Archive**: Original files stored in Azure Blob Storage with secure access
+8. **Review**: Users can view invoice details and approve or reject the processed invoice
+9. **Feedback**: Users can correct misclassifications to improve future accuracy
+10. **Approve/Reject**: Users can approve invoices for final acceptance or reject and delete them
+11. **Access**: RESTful API provides data access for external systems
+12. **View**: Users can view/download original invoice files through secure links
 
 ### Target Users
 - **Primary**: Fleet managers and maintenance administrators
@@ -57,9 +59,35 @@ The system processes vehicle maintenance invoices through the following workflow
 
 ---
 
-## 3. Functional Requirements
+## 3. User Stories
 
-### 3.1 File Processing Module
+### Fleet Manager User Stories
+- **US-001**: As a fleet manager, I want to upload vehicle maintenance invoices so that I can digitize our paper-based records
+- **US-002**: As a fleet manager, I want the system to automatically extract key information (vehicle ID, odometer, invoice number, date, total cost) so that I don't have to manually enter this data
+- **US-003**: As a fleet manager, I want to see a standardized maintenance summary description so that I can quickly understand what services were performed without reading all the detailed line items
+- **US-004**: As a fleet manager, I want line items automatically classified as Parts, Labor, or Fees so that I can track maintenance costs by category
+- **US-005**: As a fleet manager, I want to approve or reject processed invoices so that I can ensure data accuracy before final storage
+
+### Maintenance Technician User Stories  
+- **US-006**: As a maintenance technician, I want to access invoice data through an API so that I can integrate it with our existing maintenance management system
+- **US-007**: As a maintenance technician, I want to view the original invoice files so that I can verify details when needed
+- **US-008**: As a maintenance technician, I want to see confidence scores for extracted data so that I know which information might need manual verification
+
+### System Administrator User Stories
+- **US-009**: As a system administrator, I want to manage field label mappings so that I can help the system better recognize varying invoice formats from different vendors
+- **US-010**: As a system administrator, I want to monitor AI processing costs and usage so that I can stay within budget limits
+- **US-011**: As a system administrator, I want the system to gracefully handle AI service outages so that invoice processing can continue with fallback methods
+
+### Accountant User Stories
+- **US-012**: As an accountant, I want to see detailed breakdowns of parts vs labor costs so that I can properly categorize expenses for financial reporting
+- **US-013**: As an accountant, I want access to original invoice files with audit trails so that I can verify transactions during financial audits
+- **US-014**: As an accountant, I want consistent, standardized description summaries so that I can easily identify similar types of maintenance work across different invoices
+
+---
+
+## 4. Functional Requirements
+
+### 4.1 File Processing Module
 
 #### FR-001: File Upload
 - **Description**: Support upload of PDF and PNG invoice files
@@ -170,17 +198,29 @@ The system processes vehicle maintenance invoices through the following workflow
   - **Store part numbers in the PartNumber column only for Parts line items**
   - **Store NULL for PartNumber when no dedicated part number column exists or item is not a Part**
 
-#### FR-007: Line Item Classification
-- **Description**: Automatically classify invoice line items as "Part" or "Labor" based on description text analysis
+#### FR-007: Integrated Line Item Classification via GPT-4o with Intelligent Fallback
+- **Description**: Perform line item classification as part of the comprehensive GPT-4o processing, with database-driven fallback when rate limits are encountered
 - **Acceptance Criteria**:
-  - Implement keyword-based classification rules as initial solution
-  - Achieve 85% accuracy on initial keyword-based classification
-  - Store classification results in database with confidence scores
-  - Support user feedback to correct misclassifications
-  - Log all classification decisions for model training
-  - Provide fallback classification when confidence is low
-  - Handle edge cases (mixed items, unclear descriptions)
-  - Support batch reclassification of historical data
+  - **GPT-4o Integrated Classification**: Line item classification happens within the single comprehensive GPT-4o call:
+    - Classify each line item as Part, Labor, Fee, Tax, or Other
+    - Include classification confidence scores in JSON output
+    - Consider entire invoice context when making classification decisions
+    - Extract part numbers for items classified as "Part"
+  - **Fallback Rule-Based Classification**: When GPT-4o is unavailable, use database-driven keywords:
+    - Apply classification using keywords stored in `PartLaborKeywords` table
+    - Support case-insensitive matching with configurable match types (exact, partial, contains)
+    - Maintain keyword effectiveness tracking with usage statistics
+    - Enable administrative management of keyword database
+  - **Processing Workflow**:
+    - **Primary**: GPT-4o processes all line items in single call with full context
+    - **Fallback**: Apply rule-based classification using database keywords when rate limited
+    - **Consistency**: Ensure same classification categories used in both approaches
+    - **Audit Trail**: Log which processing method was used (GPT-4o vs fallback)
+  - **Quality and Performance Targets**:
+    - Achieve 95% accuracy with GPT-4o comprehensive processing
+    - Maintain 80% accuracy with fallback rule-based classification
+    - Process all line items consistently within single approach per invoice
+    - Store classification method and confidence scores for quality monitoring
 
 #### FR-008: Machine Learning Classification Enhancement
 - **Description**: Evolve from rule-based to ML-based line item classification for improved accuracy
@@ -194,18 +234,42 @@ The system processes vehicle maintenance invoices through the following workflow
   - Implement A/B testing framework to compare rule-based vs ML approaches
   - Support model versioning and rollback capabilities
 
-#### FR-009: Field Label Normalization
-- **Description**: Standardize inconsistent field labels from various invoice formats to database schema
+#### FR-009: Comprehensive GPT-4o Invoice Processing with Intelligent Fallback
+- **Description**: Use GPT-4o for comprehensive invoice processing in a single API call, with database-driven fallback when rate limits are reached
 - **Acceptance Criteria**:
-  - Implement dictionary-based lookup for common field variations
-  - Normalize "Invoice"/"Invoice No"/"RO#" → "InvoiceNumber"
-  - Normalize "Mileage"/"Odometer"/"Miles" → "Mileage"  
-  - Normalize "Vehicle ID"/"Vehicle Registration" → "VehicleRegistration"
-  - Store original extracted labels alongside normalized versions
-  - Support user feedback to improve normalization rules
-  - Log all normalization decisions for analysis and improvement
-  - Handle new/unseen field label variations gracefully
-  - Maintain mapping history for audit purposes
+  - **Single-Call GPT-4o Processing**: One comprehensive GPT-4o call per invoice upload:
+    - Input: Raw Form Recognizer JSON output
+    - Output: Structured JSON matching database schema with normalized fields and classified line items
+    - Process: Field mapping, normalization, and line item classification in single request
+    - Timeout: 30 seconds maximum with proper error handling
+  - **GPT-4o Output Schema**: Structured JSON response containing:
+    - **Header Fields**: VehicleID, InvoiceNumber, InvoiceDate, Odometer, TotalCost, etc.
+    - **Description Summary**: Comprehensive summary of all line item descriptions and services performed
+    - **Line Items Array**: Each with Description, UnitCost, Quantity, TotalLineCost, PartNumber, Classification (Part/Labor/Fee)
+    - **Confidence Scores**: Overall confidence and per-field confidence ratings
+    - **Processing Notes**: Any ambiguities or assumptions made during processing
+  - **Rate Limit Handling**: Graceful fallback when GPT-4o is unavailable:
+    - Detect rate limit responses (429 status codes)
+    - Automatically switch to intelligent fallback processing
+    - Log rate limit encounters for monitoring
+    - Continue processing without user-visible errors
+  - **Database-Driven Fallback System**:
+    - **Field Mapping**: Use `InvoiceFields` table for field label normalization
+    - **Classification**: Use `PartLaborKeywords` table for rule-based line item classification
+    - **Expandable Keywords**: Support administrative addition of new field mappings and keywords
+    - **Learning Capability**: Optionally store successful GPT-4o patterns for future fallback improvement
+  - **Description Summary Generation**: Generate standardized summary using maintenance-friendly terminology:
+    - **Input**: All line item descriptions from the invoice
+    - **Output**: Standardized, professional summary using common maintenance terminology
+    - **Style**: Invoice-friendly labels rather than verbatim line item descriptions
+    - **Examples**: "Oil Change Service and Inspection", "Brake System Repair", "Routine Maintenance", "Engine Diagnostics and Parts Replacement"
+    - **Length**: Concise phrase or single sentence using industry-standard terminology
+    - **Standardization**: Transform detailed line items into common maintenance categories:
+      - Oil/fluid services → "Oil Change Service" or "Fluid Service"
+      - Multiple brake items → "Brake System Service" or "Brake Repair"
+      - Diagnostic work → "Engine Diagnostics" or "System Diagnostics"
+      - Mixed services → "Routine Maintenance" or "General Service"
+    - **Integration**: Include summary generation in the single comprehensive GPT-4o call
 
 #### FR-010: Semantic Field Normalization Enhancement
 - **Description**: Enhance field normalization with semantic similarity matching for unseen variations
@@ -219,17 +283,28 @@ The system processes vehicle maintenance invoices through the following workflow
   - Support threshold-based fallback to manual review
   - Enable continuous learning from user feedback
 
-#### FR-011: Unified Processing Pipeline
-- **Description**: Integrate normalization and classification into the core processing workflow
+#### FR-011: Single-Call Comprehensive Processing Pipeline
+- **Description**: Implement streamlined processing pipeline with single GPT-4o call for complete invoice enhancement
 - **Acceptance Criteria**:
-  - Execute field normalization immediately after Form Recognizer extraction
-  - Perform line item classification before database storage
-  - Maintain processing order: Extract → Normalize → Classify → Store
-  - Support modular architecture for easy classifier/normalizer updates
-  - Preserve original extracted data alongside processed versions
-  - Handle processing failures gracefully with partial results
-  - Support pipeline configuration and feature toggling
-  - Maintain processing metadata and audit trails
+  - **Unified Processing Workflow**: Execute processing in optimal sequence:
+    - Step 1: Form Recognizer extracts raw OCR data
+    - Step 2: Single comprehensive GPT-4o call transforms raw data into structured database-ready JSON
+    - Step 3: Direct database storage of structured output
+    - Step 4: Fallback processing only when GPT-4o fails or rate limited
+  - **GPT-4o Integration**: Single API call handles all intelligence processing:
+    - Field mapping and normalization
+    - Line item classification and part number extraction
+    - Data validation and error correction
+    - Confidence scoring and quality assessment
+  - **Fallback Architecture**: Seamless degradation when GPT-4o unavailable:
+    - Database-driven field mapping using `InvoiceFields` table
+    - Database-driven classification using `PartLaborKeywords` table
+    - Maintain processing pipeline consistency regardless of method used
+  - **Processing Metadata**: Track and store processing information:
+    - Method used (GPT-4o-enhanced vs fallback)
+    - Processing timestamps and performance metrics
+    - Confidence scores and quality indicators
+    - Error handling and retry logic results
 
 #### FR-012: Feedback and Continuous Learning System
 - **Description**: Implement user feedback mechanisms to improve classification and normalization accuracy
@@ -476,7 +551,7 @@ The system processes vehicle maintenance invoices through the following workflow
 
 ---
 
-## 4. API Specification
+## 5. API Specification
 
 ### Base URL
 ```
@@ -541,7 +616,58 @@ https://[app-name].azurewebsites.net/api
   - `classifierType` (optional): Filter by classification type
 - **Response**: Accuracy statistics, confidence distributions, and improvement trends
 
-### LLM Enhancement Endpoints (GPT-4o Integration)
+### Comprehensive GPT-4o Processing Endpoints
+
+#### POST /llm/process-invoice
+- **Purpose**: Single comprehensive call to process invoice using GPT-4o with structured output
+- **Body**: JSON with Form Recognizer raw output and processing options
+- **Request Example**:
+  ```json
+  {
+    "formRecognizerData": "{\"vendor\": \"Honda Service Center\", \"lines\": [...]}",
+    "options": {
+      "includeConfidenceScores": true,
+      "validateTotals": true,
+      "extractPartNumbers": true,
+      "classifyLineItems": true
+    }
+  }
+  ```
+- **Response**: Complete structured invoice data ready for database storage
+- **Example Response**:
+  ```json
+  {
+    "success": true,
+    "processingMethod": "GPT4o-Enhanced",
+    "invoice": {
+      "header": {
+        "vehicleId": "VEH001",
+        "invoiceNumber": "HSC-2025-142",
+        "invoiceDate": "2025-08-22",
+        "odometer": 67890,
+        "totalCost": 284.50,
+        "description": "Oil Change Service and General Inspection"
+      },
+      "lineItems": [
+        {
+          "lineNumber": 1,
+          "description": "Oil Change Service",
+          "classification": "Labor",
+          "unitCost": 45.00,
+          "quantity": 1,
+          "totalCost": 45.00,
+          "confidence": 0.95
+        }
+      ],
+      "overallConfidence": 0.92,
+      "processingNotes": ["All fields mapped successfully", "2 part numbers extracted"]
+    }
+  }
+  ```
+
+#### POST /llm/test-connection
+- **Purpose**: Test GPT-4o connectivity and rate limit status
+- **Response**: Connection status and current rate limit information
 
 #### POST /llm/test-connection
 - **Purpose**: Test GPT-4o connectivity and API functionality
@@ -627,7 +753,7 @@ https://[app-name].azurewebsites.net/api
 
 ---
 
-## 5. Non-Functional Requirements
+## 6. Non-Functional Requirements
 
 ### Performance
 - **Response Time**: API responses < 2 seconds
@@ -671,7 +797,7 @@ https://[app-name].azurewebsites.net/api
 
 ---
 
-## 6. Technical Architecture
+## 7. Technical Architecture
 
 ### Technology Stack
 - **Frontend**: ASP.NET Core MVC / Blazor Server
@@ -690,7 +816,7 @@ Internet → Azure App Service → Azure SQL Database
 
 ---
 
-## 7. Database Schema
+## 8. Database Schema
 
 **Note**: All timestamp columns use DATETIME2 with GETUTCDATE() defaults to ensure consistent UTC time storage across the system.
 
@@ -710,6 +836,7 @@ Stores one record per invoice with summary information extracted from invoice he
 | TotalCost | DECIMAL(18,2) | NOT NULL | Grand total from invoice |
 | TotalPartsCost | DECIMAL(18,2) | NOT NULL | Calculated sum of parts lines |
 | TotalLaborCost | DECIMAL(18,2) | NOT NULL | Calculated sum of labor lines |
+| Description | NVARCHAR(MAX) | NULL | GPT-4o generated summary of all line item descriptions |
 | BlobFileUrl | NVARCHAR(255) | NOT NULL | Azure Blob Storage URL |
 | Approved | BIT | NOT NULL, DEFAULT 0 | Approval status |
 | ApprovedAt | DATETIME2 | NULL | Timestamp when invoice was approved (UTC) |
@@ -735,15 +862,48 @@ Stores multiple records per invoice - one for each line item with classification
 | Category | NVARCHAR(100) | NULL | Parts, Labor, Tax, Fee, Service |
 | ClassifiedCategory | NVARCHAR(50) | NOT NULL | Part or Labor (ML classification) |
 | ClassificationConfidence | DECIMAL(5,2) | NULL | ML classification confidence score |
-| ClassificationMethod | NVARCHAR(50) | NOT NULL | Rule-based, ML.NET, Azure-AI, Manual |
+| ClassificationMethod | NVARCHAR(50) | NOT NULL | GPT4o-Enhanced, Fallback-Rules, Manual |
 | ClassificationVersion | NVARCHAR(20) | NULL | Version of classification model used |
 | OriginalCategory | NVARCHAR(100) | NULL | Original extracted category before classification |
 | ExtractionConfidence | DECIMAL(5,2) | NULL | Line extraction confidence from OCR |
 | CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time (UTC) |
 
+### InvoiceFields Table (Fallback Support)
+Stores field label mappings for fallback processing when GPT-4o is unavailable.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| FieldMappingID | INT IDENTITY | PRIMARY KEY | Auto-generated |
+| TargetFieldName | NVARCHAR(50) | NOT NULL | Standard field name (VehicleID, InvoiceNumber, Odometer) |
+| ExpectedValue | NVARCHAR(100) | NOT NULL | Possible field label variation |
+| MatchType | NVARCHAR(20) | NOT NULL | EXACT, PARTIAL, CONTAINS |
+| IsActive | BIT | NOT NULL, DEFAULT 1 | Enable/disable mapping |
+| UsageCount | INT | NOT NULL, DEFAULT 0 | How often this mapping was used |
+| SuccessRate | DECIMAL(5,2) | NULL | Success rate percentage for this mapping |
+| CreatedBy | NVARCHAR(50) | NOT NULL | Admin, System, Import |
+| CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time (UTC) |
+| LastUsedAt | DATETIME2 | NULL | Last time this mapping was applied |
+
+### PartLaborKeywords Table (Fallback Support)
+Stores keywords for fallback classification when GPT-4o is unavailable.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| KeywordID | INT IDENTITY | PRIMARY KEY | Auto-generated |
+| Keyword | NVARCHAR(100) | NOT NULL | Classification keyword |
+| Classification | NVARCHAR(20) | NOT NULL | Part, Labor, Fee, Tax, Other |
+| MatchType | NVARCHAR(20) | NOT NULL | EXACT, PARTIAL, CONTAINS |
+| Weight | DECIMAL(3,2) | NOT NULL, DEFAULT 1.0 | Keyword importance weight |
+| IsActive | BIT | NOT NULL, DEFAULT 1 | Enable/disable keyword |
+| UsageCount | INT | NOT NULL, DEFAULT 0 | How often this keyword was matched |
+| SuccessRate | DECIMAL(5,2) | NULL | Success rate percentage for this keyword |
+| CreatedBy | NVARCHAR(50) | NOT NULL | Admin, System, Import |
+| CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation time (UTC) |
+| LastUsedAt | DATETIME2 | NULL | Last time this keyword was matched |
+
 ---
 
-## 8. Development Timeline (65 Working Days)
+## 9. Development Timeline (65 Working Days)
 
 ### Phase 1: Foundation & Core Features (Days 1-20)
 - Azure resource provisioning
@@ -771,15 +931,17 @@ Stores multiple records per invoice - one for each line item with classification
 - Classification accuracy monitoring
 
 ### Phase 4: Advanced Intelligence (Days 51-65)
+- GPT-4o integration for comprehensive processing
+- Description summary generation
 - Semantic similarity for field normalization
-- Azure OpenAI integration
+- Rate limit handling and fallback systems
 - Comprehensive monitoring dashboard
 - Performance analytics
 - System optimization
 
 ---
 
-## 9. Success Criteria
+## 10. Success Criteria
 
 ### Phase 1 (MVP - Core Features)
 - [ ] Process PDF and PNG invoices successfully
@@ -814,13 +976,22 @@ Stores multiple records per invoice - one for each line item with classification
 - [ ] Implement GitHub Models API integration with GPT-4o
 - [ ] Configure secure GitHub Personal Access Token authentication
 - [ ] Create LLM testing and monitoring endpoints
+- [ ] **Implement single comprehensive GPT-4o call processing pipeline**
+- [ ] **Create structured JSON schema for complete invoice processing output**
+- [ ] **Implement rate limit detection and graceful degradation to database fallback**
+- [ ] **Create fallback processing using InvoiceFields and PartLaborKeywords tables**
+- [ ] **Achieve 95% success rate for single-call comprehensive GPT-4o processing**
+- [ ] **Maintain sub-15 second response times for complete invoice processing**
 - [ ] Implement intelligent part number extraction using GPT-4o
-- [ ] Achieve 95% accuracy on AI-enhanced part number extraction
-- [ ] Implement comprehensive invoice enhancement with data validation
-- [ ] Create hybrid processing pipeline (traditional + AI)
-- [ ] Implement AI-powered anomaly detection and error correction
-- [ ] Add configurable AI feature toggles and cost controls
+- [ ] **Generate comprehensive description summaries of all line items using GPT-4o**
+- [ ] Achieve 90% accuracy on field mapping through comprehensive AI processing
+- [ ] Achieve 85% accuracy on part/labor classification through integrated AI analysis
+- [ ] Implement data validation and confidence scoring for all AI outputs
+- [ ] Create administrative controls for processing method selection and overrides
+- [ ] Add cost monitoring and usage analytics for GPT-4o API consumption
+- [ ] Implement error handling and recovery mechanisms for AI processing failures
 - [ ] Achieve 92% overall accuracy on AI-enhanced invoice processing
+- [ ] **Implement administrative interfaces for keyword and field mapping management**
 
 ### Phase 5 (Continuous Learning)
 - [ ] Implement automated model retraining
@@ -831,7 +1002,7 @@ Stores multiple records per invoice - one for each line item with classification
 
 ---
 
-## 10. Risk Assessment
+## 11. Risk Assessment
 
 ### High Priority Risks
 1. **Vendor Format Variability**: Different vendors may have significantly different invoice layouts
@@ -844,18 +1015,22 @@ Stores multiple records per invoice - one for each line item with classification
    - *Mitigation*: Implement queuing system and cost monitoring
 5. **Data Privacy**: Sensitive financial information handling
    - *Mitigation*: Implement encryption at rest and in transit
-6. **GPT-4o Service Availability**: External AI service dependency may impact processing reliability
-   - *Mitigation*: Implement fallback to traditional processing, service health monitoring, and graceful degradation
-7. **AI API Costs**: GPT-4o usage costs may escalate with high volume processing
-   - *Mitigation*: Implement usage monitoring, cost alerts, configurable rate limits, and cost-based processing controls
-8. **AI Data Security**: Sensitive invoice data transmission to external AI services
+6. **GPT-4o Rate Limiting**: GitHub Models API rate limits may block comprehensive processing
+   - *Mitigation*: Implement intelligent rate limit detection, graceful degradation to database fallback, retry logic with exponential backoff
+7. **Single Point of AI Failure**: Dependency on single comprehensive GPT-4o call for processing
+   - *Mitigation*: Robust fallback system using InvoiceFields and PartLaborKeywords tables, clear failure mode handling
+8. **AI Processing Costs**: Single comprehensive calls may be more expensive per invoice
+   - *Mitigation*: Cost monitoring, usage analytics, intelligent processing method selection based on complexity
+9. **AI Data Security**: Comprehensive invoice data transmission to external AI services
    - *Mitigation*: Data sanitization, secure API endpoints, no persistent storage on AI services, audit logging
-9. **AI Model Reliability**: GPT-4o responses may be inconsistent or inaccurate
-   - *Mitigation*: Confidence scoring, validation against traditional methods, human review for low-confidence results
+10. **AI Response Consistency**: Large comprehensive responses may have variable quality across different sections
+    - *Mitigation*: Section-by-section confidence scoring, validation against business rules, partial fallback capabilities
+11. **Fallback System Maintenance**: Database-driven fallback may become stale without continuous GPT-4o learning
+    - *Mitigation*: Periodic batch updates to fallback tables, administrative tools for manual maintenance, quality metrics tracking
 
 ---
 
-## 11. Quality Assurance and Testing
+## 12. Quality Assurance and Testing
 
 ### Test Coverage Requirements
 - **Unit Tests**: 90% code coverage for data extraction and parsing logic
@@ -863,6 +1038,7 @@ Stores multiple records per invoice - one for each line item with classification
 - **Regression Tests**: Automated tests for numeric parsing edge cases
 - **Performance Tests**: Load testing with 1000+ invoices
 - **Security Tests**: Vulnerability scanning and penetration testing
+- **AI Processing Tests**: GPT-4o integration and description generation testing
 
 ### Numeric Extraction Test Cases
 - Standard integers (e.g., "67890", "123456")
@@ -872,9 +1048,17 @@ Stores multiple records per invoice - one for each line item with classification
 - Mixed format invoices
 - Currency values with various formatting
 
+### Description Summary Test Cases
+- **Single service type**: Oil change items → "Oil Change Service"
+- **Multiple brake items**: Brake pads, rotors, labor → "Brake System Repair"
+- **Mixed maintenance**: Oil, filters, inspection → "Routine Maintenance"
+- **Diagnostic work**: Computer diagnostic, troubleshooting → "Engine Diagnostics"
+- **Complex invoices**: Multiple service categories → appropriate combined summary
+- **Edge cases**: Empty descriptions, very long descriptions, special characters
+
 ---
 
-## 12. Appendices
+## 13. Appendices
 
 ### A. Glossary
 - **OCR**: Optical Character Recognition
@@ -891,6 +1075,10 @@ Stores multiple records per invoice - one for each line item with classification
 - **AI Enhancement**: Process of using artificial intelligence to improve and validate extracted invoice data
 - **Hybrid Processing**: Combination of traditional rule-based processing with AI-powered enhancement
 - **Fallback Processing**: Automatic switch to traditional processing methods when AI services are unavailable
+- **Database-Driven Classification**: Method of using stored keywords and field mappings in database tables for classification and normalization, reducing dependency on external AI services
+- **Intelligent Fallback**: System that uses GPT-4o as a secondary method when primary database-driven methods don't provide results
+- **Learning Loop**: Automatic process of storing successful GPT-4o results back to database for future direct matching
+- **Cost Reduction Strategy**: Approach to minimize expensive AI API calls by building up database knowledge over time
 
 ### B. References
 - Azure Form Recognizer Documentation
@@ -913,3 +1101,10 @@ Stores multiple records per invoice - one for each line item with classification
 - **AI Enhancement Integration**: Execute AI processing in parallel with traditional methods for comparison
 - **Cost Optimization**: Implement request batching and intelligent caching to minimize API calls
 - **Security**: Sanitize invoice data before transmission to external AI services
+- **Database-Driven Intelligence**: 
+  - Primary processing uses database lookups for field mappings and classification keywords
+  - Secondary processing uses GPT-4o only for items not found in database
+  - Automatic learning saves successful GPT-4o results to database for future direct matching
+  - Target: 80% reduction in GPT-4o calls within 6 months through accumulated learning
+- **Keyword Management**: Support manual keyword addition, effectiveness tracking, and automatic pruning
+- **Field Mapping Strategy**: Case-insensitive matching with support for exact, partial, and contains match types
