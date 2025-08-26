@@ -283,7 +283,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
                 TotalLineCost = l.TotalLineCost,
                 PartNumber = l.PartNumber,
                 Category = l.Category,
-                ConfidenceScore = l.ConfidenceScore
+                ConfidenceScore = l.ExtractionConfidence
             }).OrderBy(l => l.LineNumber).ToList()
         })
         .ToListAsync();
@@ -432,7 +432,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
                     TotalLineCost = l.TotalLineCost,
                     PartNumber = l.PartNumber,
                     Category = l.Category,
-                    ConfidenceScore = l.ConfidenceScore
+                    ConfidenceScore = l.ExtractionConfidence
                 })
                 .ToList()
         })
@@ -495,7 +495,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
                     TotalLineCost = l.TotalLineCost,
                     PartNumber = l.PartNumber,
                     Category = l.Category,
-                    ConfidenceScore = l.ConfidenceScore
+                    ConfidenceScore = l.ExtractionConfidence
                 })
                 .ToList()
         })
