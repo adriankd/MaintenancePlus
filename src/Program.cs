@@ -39,6 +39,9 @@ builder.Services.AddScoped<ILineItemClassifier, RuleBasedLineItemClassifier>();
 builder.Services.AddScoped<IFieldNormalizer, DictionaryBasedFieldNormalizer>();
 builder.Services.AddScoped<IInvoiceIntelligenceService, RuleBasedInvoiceIntelligenceService>();
 
+// Register Phase 3 LLM Enhancement Services (GitHub Models / GPT-4o)
+builder.Services.AddHttpClient<IGitHubModelsService, GitHubModelsService>();
+
 // Add API documentation
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

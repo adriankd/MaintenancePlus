@@ -383,6 +383,97 @@ The system processes vehicle maintenance invoices through the following workflow
   - Include approval status in API responses
   - Add approval status filter to invoice list views
 
+### 3.6 AI-Powered Enhancement Module (GPT-4o Integration)
+
+#### FR-024: GPT-4o Integration Infrastructure
+- **Description**: Integrate OpenAI's GPT-4o model via GitHub Models API for advanced invoice processing capabilities
+- **Acceptance Criteria**:
+  - Implement secure API integration with GitHub Models endpoint (https://models.inference.ai.azure.com)
+  - Configure GitHub Personal Access Token authentication
+  - Support rate limiting and error handling for API calls
+  - Implement proper request/response logging for debugging
+  - Provide fallback mechanisms when AI service is unavailable
+  - Maintain cost monitoring and usage tracking
+  - Support timeout configuration (default 30 seconds per request)
+
+#### FR-025: Intelligent Part Number Extraction
+- **Description**: Enhance part number extraction using GPT-4o's automotive expertise and pattern recognition
+- **Acceptance Criteria**:
+  - **Advanced Pattern Recognition**: Utilize GPT-4o to identify part numbers using:
+    - OEM-specific formats (Honda: 12345-ABC-123, Toyota: 90210-54321, Ford: F1XZ-1234-AB)
+    - Cross-reference numbers and alternative part numbers
+    - Context-aware validation using surrounding invoice text
+  - **Multi-vendor Support**: Handle manufacturer-specific part number conventions
+  - **Confidence Scoring**: Provide AI-generated confidence scores for each extracted part number
+  - **Fallback Integration**: Use GPT-4o as enhancement to existing extraction, not replacement
+  - **Quality Assurance**: Achieve 95% accuracy on part number extraction when combined with traditional methods
+  - **Audit Trail**: Log AI extraction results alongside traditional extraction for comparison
+
+#### FR-026: Comprehensive Invoice Enhancement
+- **Description**: Use GPT-4o to enhance and validate entire invoice processing workflow
+- **Acceptance Criteria**:
+  - **Service Classification**: Automatically categorize line items into detailed service types:
+    - Oil Change, Brake Service, Engine Repair, Transmission Work, Electrical Repair, Tire Service, etc.
+  - **Data Validation**: Identify and flag potential OCR errors in:
+    - Inconsistent totals and missing quantities
+    - Unclear or suspicious part descriptions
+    - Number formatting issues and calculation discrepancies
+  - **Data Standardization**: Normalize and clean extracted data:
+    - Standardize part descriptions (remove extra spaces, fix common OCR errors)
+    - Normalize units of measure and quantities
+    - Standardize service categories using consistent naming
+  - **Quality Enhancement**: Improve overall data quality by:
+    - Suggesting corrections for likely OCR errors
+    - Providing alternative interpretations for ambiguous text
+    - Cross-validating extracted data against automotive knowledge base
+
+#### FR-027: AI-Powered Validation and Error Correction
+- **Description**: Implement intelligent validation using GPT-4o's reasoning capabilities
+- **Acceptance Criteria**:
+  - **Anomaly Detection**: Identify unusual patterns that may indicate extraction errors:
+    - Parts costs that seem unusually high or low
+    - Service descriptions that don't match common automotive terminology
+    - Inconsistent vehicle information across invoice sections
+  - **Smart Suggestions**: Provide AI-powered suggestions for:
+    - Likely intended values for unclear OCR extractions
+    - Standard part description corrections
+    - Missing information that can be inferred from context
+  - **Confidence-Based Processing**: Route invoices for manual review based on AI confidence scores
+  - **Contextual Validation**: Use automotive domain knowledge to validate:
+    - Part-service relationships (ensure parts match typical service procedures)
+    - Reasonable cost ranges for different types of services
+    - Logical consistency across the entire invoice
+
+#### FR-028: LLM Testing and Monitoring Endpoints
+- **Description**: Provide dedicated endpoints for testing and monitoring GPT-4o integration
+- **Acceptance Criteria**:
+  - **Connection Testing**: `/api/llm/test-connection` endpoint to verify GitHub Models API connectivity
+  - **Part Extraction Testing**: `/api/llm/extract-parts` endpoint for testing part number extraction on text samples
+  - **Invoice Enhancement Testing**: `/api/llm/enhance-invoice` endpoint for testing complete invoice enhancement
+  - **Performance Monitoring**: Track response times, success rates, and error patterns
+  - **Cost Monitoring**: Monitor API usage and associated costs
+  - **Quality Metrics**: Compare AI-enhanced results with traditional extraction methods
+
+#### FR-029: Hybrid Processing Pipeline
+- **Description**: Integrate GPT-4o enhancement into existing invoice processing workflow
+- **Acceptance Criteria**:
+  - **Seamless Integration**: AI enhancement occurs transparently within existing pipeline
+  - **Configurable Enhancement**: Allow enabling/disabling of AI features via configuration
+  - **Performance Optimization**: Ensure AI enhancement doesn't significantly impact processing time
+  - **Fallback Support**: Graceful degradation when AI services are unavailable
+  - **Result Comparison**: Store both traditional and AI-enhanced results for quality analysis
+  - **Progressive Enhancement**: Use AI to improve results rather than replace existing functionality
+
+#### FR-030: AI Enhancement Configuration and Management
+- **Description**: Provide administrative controls for managing AI-powered features
+- **Acceptance Criteria**:
+  - **Feature Toggles**: Enable/disable specific AI features independently
+  - **Threshold Configuration**: Set confidence thresholds for different AI operations
+  - **Cost Controls**: Set usage limits and alerts for API consumption
+  - **Model Version Management**: Support updating to newer GPT-4o model versions
+  - **Performance Tuning**: Adjust timeout, retry, and rate limiting parameters
+  - **Quality Monitoring**: Track and report AI enhancement effectiveness
+
 ---
 
 ## 4. API Specification
@@ -450,6 +541,90 @@ https://[app-name].azurewebsites.net/api
   - `classifierType` (optional): Filter by classification type
 - **Response**: Accuracy statistics, confidence distributions, and improvement trends
 
+### LLM Enhancement Endpoints (GPT-4o Integration)
+
+#### POST /llm/test-connection
+- **Purpose**: Test GPT-4o connectivity and API functionality
+- **Authentication**: GitHub Personal Access Token via configuration
+- **Response**: Connection status, model availability, and capability confirmation
+- **Example Response**:
+  ```json
+  {
+    "status": "success",
+    "response": {
+      "status": "connected",
+      "model": "gpt-4o",
+      "timestamp": "2025-08-21T10:30:00Z",
+      "capabilities": ["text_processing", "json_output", "automotive_expertise"]
+    },
+    "message": "GPT-4o connection successful via GitHub Models"
+  }
+  ```
+
+#### POST /llm/extract-parts
+- **Purpose**: Extract automotive part numbers from text using GPT-4o advanced pattern recognition
+- **Body**: JSON with invoice text and optional brand preference
+- **Request Example**:
+  ```json
+  {
+    "invoiceText": "1 EA ENGINE OIL FILTER 15400-PLM-A02 Honda OEM\n2 QT MOTOR OIL 5W-30 Mobile 1",
+    "preferredBrand": "Honda"
+  }
+  ```
+- **Response**: Structured part number extraction with confidence scores
+- **Example Response**:
+  ```json
+  {
+    "status": "success",
+    "result": {
+      "part_numbers": [
+        {
+          "number": "15400-PLM-A02",
+          "line_text": "1 EA ENGINE OIL FILTER 15400-PLM-A02 Honda OEM",
+          "confidence": 0.98,
+          "type": "OEM",
+          "brand": "Honda"
+        }
+      ]
+    },
+    "processed_with": "GPT-4o part number extraction"
+  }
+  ```
+
+#### POST /llm/enhance-invoice
+- **Purpose**: Comprehensive invoice enhancement using GPT-4o intelligence
+- **Body**: JSON with raw invoice data from Form Recognizer
+- **Request Example**:
+  ```json
+  {
+    "invoiceData": "{\"vendor\": \"Honda Service Center\", \"lines\": [...]}",
+    "includePartNumbers": true,
+    "includeClassification": true,
+    "validateData": true
+  }
+  ```
+- **Response**: Enhanced invoice data with AI improvements
+- **Example Response**:
+  ```json
+  {
+    "status": "success",
+    "enhanced_data": {
+      "validated_totals": {...},
+      "classified_services": {...},
+      "extracted_parts": {...},
+      "corrected_ocr_errors": {...}
+    },
+    "confidence_score": 0.92,
+    "improvements": [
+      "Part numbers extracted and classified",
+      "Service categories standardized",
+      "3 OCR errors corrected",
+      "Total calculations validated"
+    ],
+    "processed_with": "GPT-4o via GitHub Models"
+  }
+  ```
+
 ---
 
 ## 5. Non-Functional Requirements
@@ -458,8 +633,11 @@ https://[app-name].azurewebsites.net/api
 - **Response Time**: API responses < 2 seconds
 - **Processing Time**: Invoice processing < 30 seconds (including classification and normalization)
 - **Classification Time**: Line item classification < 5 seconds per invoice
+- **LLM Enhancement Time**: GPT-4o processing < 15 seconds per invoice
+- **LLM Response Time**: Individual GPT-4o API calls < 30 seconds with timeout handling
 - **Throughput**: Support 100 concurrent users
 - **File Processing**: Handle up to 1000 invoices/day
+- **AI Service Reliability**: Fallback to traditional processing when LLM services unavailable
 
 ### Security
 - **Authentication**: Future implementation (Phase 2)
@@ -467,6 +645,12 @@ https://[app-name].azurewebsites.net/api
 - **Access Control**: Azure AD integration capability
 - **Audit Logging**: Track all data access and modifications
 - **File Access Logging**: Log original file view/download activities
+- **LLM Security**: 
+  - Secure GitHub Personal Access Token storage and rotation
+  - Invoice data sanitization before sending to external AI services
+  - No storage of invoice data on external AI service providers
+  - Rate limiting and usage monitoring for AI API calls
+  - Secure transmission of data to GitHub Models API endpoint
 
 ### Reliability
 - **Availability**: 99.9% uptime SLA
@@ -626,11 +810,24 @@ Stores multiple records per invoice - one for each line item with classification
 - [ ] Support model versioning and rollback
 - [ ] Implement A/B testing framework
 
-### Phase 4 (Continuous Learning)
+### Phase 4 (AI-Powered Enhancement - GPT-4o Integration)
+- [ ] Implement GitHub Models API integration with GPT-4o
+- [ ] Configure secure GitHub Personal Access Token authentication
+- [ ] Create LLM testing and monitoring endpoints
+- [ ] Implement intelligent part number extraction using GPT-4o
+- [ ] Achieve 95% accuracy on AI-enhanced part number extraction
+- [ ] Implement comprehensive invoice enhancement with data validation
+- [ ] Create hybrid processing pipeline (traditional + AI)
+- [ ] Implement AI-powered anomaly detection and error correction
+- [ ] Add configurable AI feature toggles and cost controls
+- [ ] Achieve 92% overall accuracy on AI-enhanced invoice processing
+
+### Phase 5 (Continuous Learning)
 - [ ] Implement automated model retraining
 - [ ] Achieve 90% accuracy on line item classification
 - [ ] Create accuracy tracking dashboard
 - [ ] Implement confidence-based manual review workflows
+- [ ] Integrate AI feedback loops for continuous improvement
 
 ---
 
@@ -647,6 +844,14 @@ Stores multiple records per invoice - one for each line item with classification
    - *Mitigation*: Implement queuing system and cost monitoring
 5. **Data Privacy**: Sensitive financial information handling
    - *Mitigation*: Implement encryption at rest and in transit
+6. **GPT-4o Service Availability**: External AI service dependency may impact processing reliability
+   - *Mitigation*: Implement fallback to traditional processing, service health monitoring, and graceful degradation
+7. **AI API Costs**: GPT-4o usage costs may escalate with high volume processing
+   - *Mitigation*: Implement usage monitoring, cost alerts, configurable rate limits, and cost-based processing controls
+8. **AI Data Security**: Sensitive invoice data transmission to external AI services
+   - *Mitigation*: Data sanitization, secure API endpoints, no persistent storage on AI services, audit logging
+9. **AI Model Reliability**: GPT-4o responses may be inconsistent or inaccurate
+   - *Mitigation*: Confidence scoring, validation against traditional methods, human review for low-confidence results
 
 ---
 
@@ -680,6 +885,12 @@ Stores multiple records per invoice - one for each line item with classification
 - **Line Item Classification**: Process of categorizing invoice line items as Parts or Labor
 - **Confidence Score**: Numerical score indicating system's certainty in classification
 - **Comma-Separated Numbers**: Numeric format using commas as thousand separators (e.g., "1,234,567")
+- **GPT-4o**: OpenAI's advanced language model integrated via GitHub Models API for intelligent text processing
+- **LLM**: Large Language Model - AI system capable of understanding and generating human-like text
+- **GitHub Models API**: Microsoft's API service providing access to various AI models including GPT-4o
+- **AI Enhancement**: Process of using artificial intelligence to improve and validate extracted invoice data
+- **Hybrid Processing**: Combination of traditional rule-based processing with AI-powered enhancement
+- **Fallback Processing**: Automatic switch to traditional processing methods when AI services are unavailable
 
 ### B. References
 - Azure Form Recognizer Documentation
@@ -688,9 +899,17 @@ Stores multiple records per invoice - one for each line item with classification
 - Azure App Service Deployment Guide
 - ML.NET Text Classification Documentation
 - Regular Expression Patterns for Numeric Data
+- GitHub Models API Documentation
+- OpenAI GPT-4o Model Documentation
+- GitHub Personal Access Token Security Guidelines
 
 ### C. Technical Implementation Notes
 - **Regex Pattern for Comma-Separated Numbers**: `\d{1,3}(?:,\d{3})+`
 - **Fallback Logic**: Always attempt standard integer parsing if comma-separated parsing fails
 - **Audit Trail**: Maintain original extracted text alongside parsed values
 - **Performance**: Numeric parsing should not add more than 100ms to total processing time
+- **GPT-4o API Endpoint**: `https://models.inference.ai.azure.com/chat/completions`
+- **AI Request Timeout**: 30 seconds with exponential backoff retry logic
+- **AI Enhancement Integration**: Execute AI processing in parallel with traditional methods for comparison
+- **Cost Optimization**: Implement request batching and intelligent caching to minimize API calls
+- **Security**: Sanitize invoice data before transmission to external AI services
