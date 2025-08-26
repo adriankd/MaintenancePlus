@@ -40,7 +40,20 @@ public class InvoiceData
     public decimal? TotalCost { get; set; }
     public decimal? TotalPartsCost { get; set; }
     public decimal? TotalLaborCost { get; set; }
+    public string? Description { get; set; }
     public List<InvoiceLineData> LineItems { get; set; } = new();
+}
+
+/// <summary>
+/// Result of AI field mapping
+/// </summary>
+public class MappedInvoiceFields
+{
+    public string? InvoiceDate { get; set; }
+    public string? InvoiceNumber { get; set; }
+    public string? VehicleId { get; set; }
+    public decimal? TotalCost { get; set; }
+    public int? Odometer { get; set; }
 }
 
 /// <summary>
@@ -56,6 +69,8 @@ public class InvoiceLineData
     public string? PartNumber { get; set; }
     public string? Category { get; set; }
     public decimal ConfidenceScore { get; set; }
+    public string? ClassifiedCategory { get; set; }
+    public decimal ClassificationConfidence { get; set; }
 }
 
 /// <summary>
@@ -66,11 +81,13 @@ public class FormRecognizerService : IFormRecognizerService
     private readonly DocumentAnalysisClient _client;
     private readonly FormRecognizerOptions _options;
     private readonly ILogger<FormRecognizerService> _logger;
+    private readonly IGitHubModelsService _githubModelsService;
 
-    public FormRecognizerService(IOptions<FormRecognizerOptions> options, ILogger<FormRecognizerService> logger)
+    public FormRecognizerService(IOptions<FormRecognizerOptions> options, ILogger<FormRecognizerService> logger, IGitHubModelsService githubModelsService)
     {
         _options = options.Value;
         _logger = logger;
+        _githubModelsService = githubModelsService;
         _client = new DocumentAnalysisClient(new Uri(_options.Endpoint), new AzureKeyCredential(_options.ApiKey));
     }
 
@@ -83,7 +100,7 @@ public class FormRecognizerService : IFormRecognizerService
             var operation = await _client.AnalyzeDocumentAsync(WaitUntil.Completed, _options.ModelId, documentStream);
             var result = operation.Value;
 
-            return ProcessAnalysisResult(result);
+            return await ProcessAnalysisResult(result);
         }
         catch (Exception ex)
         {
@@ -106,7 +123,7 @@ public class FormRecognizerService : IFormRecognizerService
             var operation = await _client.AnalyzeDocumentFromUriAsync(WaitUntil.Completed, _options.ModelId, new Uri(documentUrl));
             var result = operation.Value;
 
-            return ProcessAnalysisResult(result);
+            return await ProcessAnalysisResult(result);
         }
         catch (Exception ex)
         {
@@ -200,7 +217,7 @@ public class FormRecognizerService : IFormRecognizerService
         };
     }
 
-    private FormRecognizerResult ProcessAnalysisResult(AnalyzeResult result)
+    private async Task<FormRecognizerResult> ProcessAnalysisResult(AnalyzeResult result)
     {
         try
         {
@@ -225,10 +242,20 @@ public class FormRecognizerService : IFormRecognizerService
                     confidenceScores.Add(invoiceIdField.Confidence ?? 0);
                 }
 
+                // Use GPT-4o to intelligently map fields to our expected structure
+                await MapFieldsUsingAI(document, invoiceData, confidenceScores);
+
                 if (document.Fields.TryGetValue("InvoiceDate", out var invoiceDateField) && invoiceDateField.FieldType == DocumentFieldType.Date)
                 {
                     invoiceData.InvoiceDate = invoiceDateField.Value.AsDate().DateTime;
                     confidenceScores.Add(invoiceDateField.Confidence ?? 0);
+                }
+                // Fallback to ServiceStartDate if InvoiceDate is not found
+                else if (document.Fields.TryGetValue("ServiceStartDate", out var serviceDateField) && serviceDateField.FieldType == DocumentFieldType.Date)
+                {
+                    invoiceData.InvoiceDate = serviceDateField.Value.AsDate().DateTime;
+                    confidenceScores.Add(serviceDateField.Confidence ?? 0);
+                    _logger.LogInformation("Using ServiceStartDate as invoice date fallback");
                 }
 
                 if (document.Fields.TryGetValue("InvoiceTotal", out var totalField) && totalField.FieldType == DocumentFieldType.Currency)
@@ -251,6 +278,12 @@ public class FormRecognizerService : IFormRecognizerService
 
                 // Supplement missing part numbers from table data for prebuilt invoice model
                 SupplementPartNumbersFromTables(result, invoiceData, confidenceScores);
+
+                // Enhance poor or missing descriptions with GPT-4o
+                if (document != null)
+                {
+                    invoiceData = await EnhanceDescriptionsWithAI(invoiceData, document);
+                }
 
                 // Calculate parts vs labor costs
                 CalculatePartAndLaborTotals(invoiceData);
@@ -878,7 +911,7 @@ public class FormRecognizerService : IFormRecognizerService
     private async Task<FormRecognizerResult> AnalyzeWithPrebuiltInvoice(MemoryStream documentStream)
     {
         var operation = await _client.AnalyzeDocumentAsync(WaitUntil.Completed, "prebuilt-invoice", documentStream);
-        return ProcessAnalysisResult(operation.Value, "prebuilt-invoice");
+        return await ProcessAnalysisResult(operation.Value, "prebuilt-invoice");
     }
 
     private async Task<FormRecognizerResult> AnalyzeWithGeneralDocument(MemoryStream documentStream)
@@ -1060,7 +1093,7 @@ public class FormRecognizerService : IFormRecognizerService
 
         // Labor keywords (expanded)
         var laborKeywords = new[] { "labor", "service", "diagnostic", "hour", "hrs", "install", "installation", 
-            "repair", "maintenance", "inspection", "tune", "flush", "change", "replace" };
+            "repair", "maintenance", "inspection", "tune", "flush", "change", "replace", "replacement" };
         
         if (laborKeywords.Any(keyword => desc.Contains(keyword)))
             return "Labor";
@@ -1085,6 +1118,107 @@ public class FormRecognizerService : IFormRecognizerService
 
         // Return current category if no better classification found
         return currentCategory ?? "Parts";
+    }
+
+    /// <summary>
+    /// Use GPT-4o to enhance poor or missing line item descriptions
+    /// </summary>
+    private async Task<InvoiceData> EnhanceDescriptionsWithAI(InvoiceData invoiceData, AnalyzedDocument document)
+    {
+        var itemsNeedingEnhancement = invoiceData.LineItems
+            .Where(item => string.IsNullOrWhiteSpace(item.Description) || 
+                          item.Description.Length < 3 ||
+                          item.Description.Trim().ToLower() == "description")
+            .ToList();
+
+        if (!itemsNeedingEnhancement.Any())
+        {
+            return invoiceData;
+        }
+
+        _logger.LogInformation("Found {Count} line items needing description enhancement", itemsNeedingEnhancement.Count);
+
+        // Build context from the document
+        var documentContext = new List<string>();
+        
+        // Add vendor info
+        if (document.Fields.ContainsKey("VendorName") && document.Fields["VendorName"].Content != null)
+        {
+            documentContext.Add($"Vendor: {document.Fields["VendorName"].Content}");
+        }
+        
+        // Add other line items for context
+        var contextItems = invoiceData.LineItems
+            .Where(item => !string.IsNullOrWhiteSpace(item.Description) && 
+                          item.Description.Length >= 3 &&
+                          item.Description.Trim().ToLower() != "description")
+            .Take(5) // Limit context to avoid token limits
+            .Select(item => $"• {item.Description} - ${item.TotalCost:F2}")
+            .ToList();
+        
+        if (contextItems.Any())
+        {
+            documentContext.Add("Other items on this invoice:");
+            documentContext.AddRange(contextItems);
+        }
+
+        // Process each item needing enhancement
+        foreach (var item in itemsNeedingEnhancement)
+        {
+            try
+            {
+                var prompt = $@"You are analyzing an automotive service invoice. A line item is missing or has a poor description.
+
+CONTEXT:
+{string.Join(Environment.NewLine, documentContext)}
+
+LINE ITEM NEEDING DESCRIPTION:
+• Cost: ${item.TotalCost:F2}
+• Quantity: {item.Quantity}
+• Unit Price: ${item.UnitCost:F2}
+• Current Description: ""{item.Description ?? "MISSING"}""
+• Part Number: {item.PartNumber ?? "None"}
+
+TASK: Generate a concise, professional description for this automotive service/part.
+
+GUIDELINES:
+1. Keep description under 50 characters
+2. Use standard automotive terminology
+3. Be specific but concise
+4. Consider the cost and context
+5. If it's likely a service, mention the service type
+6. If it's likely a part, mention the part name
+
+Return ONLY the description, no explanation.";
+
+                var enhancedDescription = await _githubModelsService.ProcessInvoiceTextAsync("", prompt);
+                
+                if (!string.IsNullOrEmpty(enhancedDescription) && 
+                    enhancedDescription != "GPT-4o Integration Error" &&
+                    !enhancedDescription.Contains("Error"))
+                {
+                    var cleanDescription = enhancedDescription.Trim()
+                        .Replace("\"", "")
+                        .Replace("'", "")
+                        .Replace("\n", " ")
+                        .Replace("\r", " ");
+                        
+                    if (cleanDescription.Length > 0 && cleanDescription.Length <= 100) // Reasonable length
+                    {
+                        var originalDescription = item.Description;
+                        item.Description = cleanDescription;
+                        _logger.LogInformation("AI enhanced description: '{Original}' → '{Enhanced}'", 
+                            originalDescription ?? "MISSING", cleanDescription);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to enhance description for line item with cost ${Cost}", item.TotalCost);
+            }
+        }
+
+        return invoiceData;
     }
 
     private decimal CalculateEnhancedConfidence(InvoiceData data, List<(string Strategy, FormRecognizerResult Result)> allResults)
@@ -1319,7 +1453,7 @@ public class FormRecognizerService : IFormRecognizerService
         }
     }
 
-    private FormRecognizerResult ProcessAnalysisResult(AnalyzeResult result, string modelType = "default")
+    private async Task<FormRecognizerResult> ProcessAnalysisResult(AnalyzeResult result, string modelType = "default")
     {
         var invoiceData = new InvoiceData();
         var confidenceScores = new List<float>();
@@ -1343,6 +1477,13 @@ public class FormRecognizerService : IFormRecognizerService
         if (modelType == "prebuilt-invoice")
         {
             SupplementPartNumbersFromTables(result, invoiceData, confidenceScores);
+            
+            // Enhance poor or missing descriptions with GPT-4o
+            var document = result.Documents.FirstOrDefault();
+            if (document != null)
+            {
+                invoiceData = await EnhanceDescriptionsWithAI(invoiceData, document);
+            }
         }
 
         // Calculate derived fields
@@ -1767,6 +1908,170 @@ public class FormRecognizerService : IFormRecognizerService
                 }
             }
         }
+    }
+
+    #endregion
+
+    #region AI-Powered Field Mapping
+
+    /// <summary>
+    /// Uses GPT-4o to intelligently map document fields to our expected invoice structure
+    /// </summary>
+    private async Task MapFieldsUsingAI(AnalyzedDocument document, InvoiceData invoiceData, List<float> confidenceScores)
+    {
+        try
+        {
+            // Extract available fields and their values
+            var availableFields = new Dictionary<string, object>();
+            
+            foreach (var field in document.Fields)
+            {
+                var fieldValue = ExtractFieldValue(field.Value);
+                if (fieldValue != null)
+                {
+                    availableFields[field.Key] = fieldValue;
+                }
+            }
+
+            if (!availableFields.Any())
+            {
+                _logger.LogInformation("No fields available for AI mapping");
+                return;
+            }
+
+            // Create a prompt for GPT-4o to map fields
+            var prompt = $@"You are an expert at mapping invoice document fields to a standard structure. 
+
+Available document fields and their values:
+{System.Text.Json.JsonSerializer.Serialize(availableFields, new JsonSerializerOptions { WriteIndented = true })}
+
+Please map these fields to our standard invoice structure. Return ONLY a JSON object with the following structure:
+{{
+  ""InvoiceDate"": ""YYYY-MM-DD or null"",
+  ""InvoiceNumber"": ""string or null"",
+  ""VehicleId"": ""string or null"",
+  ""TotalCost"": ""decimal or null"",
+  ""Odometer"": ""integer or null""
+}}
+
+Rules:
+- InvoiceDate: Look for any date field that represents the invoice/service date (ServiceStartDate, ServiceDate, InvoiceDate, Date, etc.)
+- InvoiceNumber: Look for invoice identifiers (InvoiceId, InvoiceNumber, Invoice, etc.)  
+- VehicleId: Look for vehicle identifiers (VehicleId, Vehicle, VIN, etc.)
+- TotalCost: Look for total amounts (InvoiceTotal, Total, TotalAmount, etc.)
+- Odometer: Look for mileage/odometer readings (Odometer, Mileage, Miles, etc.)
+- Return null for fields you cannot map confidently
+- Extract only the core value, no extra text or formatting";
+
+            _logger.LogInformation("Requesting AI field mapping for {FieldCount} fields", availableFields.Count);
+
+            var aiResponse = await _githubModelsService.ProcessInvoiceTextAsync("", prompt);
+            
+            if (!string.IsNullOrEmpty(aiResponse))
+            {
+                try
+                {
+                    // Clean the response - remove markdown code fences
+                    var cleanedResponse = aiResponse.Trim();
+                    if (cleanedResponse.StartsWith("```json"))
+                    {
+                        cleanedResponse = cleanedResponse.Substring(7); // Remove ```json
+                    }
+                    if (cleanedResponse.StartsWith("```"))
+                    {
+                        cleanedResponse = cleanedResponse.Substring(3); // Remove ```
+                    }
+                    if (cleanedResponse.EndsWith("```"))
+                    {
+                        cleanedResponse = cleanedResponse.Substring(0, cleanedResponse.Length - 3); // Remove ending ```
+                    }
+                    cleanedResponse = cleanedResponse.Trim();
+                    
+                    var mappedFields = JsonSerializer.Deserialize<MappedInvoiceFields>(cleanedResponse);
+                    
+                    // Apply the mapped fields to our invoice data
+                    if (mappedFields?.InvoiceDate != null && DateTime.TryParse(mappedFields.InvoiceDate, out var invoiceDate))
+                    {
+                        invoiceData.InvoiceDate = invoiceDate;
+                        confidenceScores.Add(0.85f); // AI mapping confidence
+                        _logger.LogInformation("AI mapped InvoiceDate: {Date}", invoiceDate);
+                    }
+                    
+                    if (!string.IsNullOrEmpty(mappedFields?.InvoiceNumber))
+                    {
+                        invoiceData.InvoiceNumber = mappedFields.InvoiceNumber;
+                        _logger.LogInformation("AI mapped InvoiceNumber: {Number}", mappedFields.InvoiceNumber);
+                    }
+                    
+                    if (!string.IsNullOrEmpty(mappedFields?.VehicleId))
+                    {
+                        invoiceData.VehicleId = mappedFields.VehicleId;
+                        _logger.LogInformation("AI mapped VehicleId: {VehicleId}", mappedFields.VehicleId);
+                    }
+                    
+                    if (mappedFields?.TotalCost != null)
+                    {
+                        invoiceData.TotalCost = mappedFields.TotalCost;
+                        confidenceScores.Add(0.85f);
+                        _logger.LogInformation("AI mapped TotalCost: {Cost}", mappedFields.TotalCost);
+                    }
+                    
+                    if (mappedFields?.Odometer != null)
+                    {
+                        invoiceData.Odometer = mappedFields.Odometer;
+                        _logger.LogInformation("AI mapped Odometer: {Odometer}", mappedFields.Odometer);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse AI field mapping response: {Response}", aiResponse);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "AI field mapping failed, continuing with traditional extraction");
+        }
+
+        // Fallback field mapping when AI is unavailable
+        if (string.IsNullOrEmpty(invoiceData.InvoiceNumber))
+        {
+            // Check common invoice number field alternatives
+            var invoiceNumberSources = new[] { "PurchaseOrder", "RO", "RONumber", "RepairOrder", "WorkOrder", "OrderNumber", "JobNumber" };
+            
+            foreach (var fieldName in invoiceNumberSources)
+            {
+                if (document.Fields.TryGetValue(fieldName, out var field) && field.Value != null)
+                {
+                    var value = ExtractFieldValue(field)?.ToString();
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        invoiceData.InvoiceNumber = value;
+                        _logger.LogInformation("Fallback mapped {FieldName} → InvoiceNumber: {Number}", fieldName, value);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts the actual value from a DocumentField
+    /// </summary>
+    private object? ExtractFieldValue(DocumentField field)
+    {
+        return field.FieldType switch
+        {
+            DocumentFieldType.String => field.Value.AsString(),
+            DocumentFieldType.Date => field.Value.AsDate().DateTime.ToString("yyyy-MM-dd"),
+            DocumentFieldType.Time => field.Value.AsTime().ToString(),
+            DocumentFieldType.PhoneNumber => field.Value.AsPhoneNumber(),
+            DocumentFieldType.Double => field.Value.AsDouble(),
+            DocumentFieldType.Int64 => field.Value.AsInt64(),
+            DocumentFieldType.Currency => field.Value.AsCurrency().Amount,
+            DocumentFieldType.Boolean => field.Value.AsBoolean(),
+            _ => field.Content
+        };
     }
 
     #endregion

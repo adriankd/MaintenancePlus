@@ -100,6 +100,18 @@
                                         <td>@Model.Odometer.Value.ToString("N0") miles</td>
                                     </tr>
                                 }
+                                @if (!string.IsNullOrEmpty(Model.Description))
+                                {
+                                    <tr>
+                                        <td><strong>Description:</strong></td>
+                                        <td>
+                                            <div class="text-muted">
+                                                <i class="fas fa-robot me-1"></i>
+                                                @Model.Description
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
                             </table>
                         </div>
                         <div class="col-md-6">
@@ -222,10 +234,10 @@
                                             <td>
                                                 @if (line.ClassificationConfidence.HasValue)
                                                 {
-                                                    var classConfidence = line.ClassificationConfidence.Value;
-                                                    var classBadgeClass = classConfidence >= 90 ? "bg-success" : classConfidence >= 75 ? "bg-warning" : "bg-danger";
+                                                    var classConfidence = line.ClassificationConfidence.Value; // Use value as-is (already a percentage as decimal)
+                                                    var classBadgeClass = classConfidence >= 0.90m ? "bg-success" : classConfidence >= 0.75m ? "bg-warning" : "bg-danger";
                                                     <div>
-                                                        <span class="badge @classBadgeClass">@classConfidence.ToString("F0")%</span>
+                                                        <span class="badge @classBadgeClass">@((classConfidence * 100).ToString("F0"))%</span>
                                                         <br />
                                                         <small class="text-muted">Classification</small>
                                                     </div>
