@@ -243,46 +243,59 @@ public class InvoiceProcessingService : IInvoiceProcessingService
         }
     }
 
-    public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page = 1, int pageSize = 20)
-    {
-        pageSize = Math.Min(pageSize, 100); // Limit page size
-        var skip = (page - 1) * pageSize;
+public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page = 1, int pageSize = 20)
+{
+    pageSize =  Math.Clamp(pageSize, 1, 100); // Limit page size
+    page = Math.Max(page, 1);
+    var skip = (page - 1) * pageSize;
 
-        var query = _context.InvoiceHeaders
-            .AsNoTracking()
-            .OrderByDescending(i => i.CreatedAt);
+    var query = _context.InvoiceHeaders        
+        .AsNoTracking()
+        .OrderByDescending(i => i.CreatedAt);
 
-        var totalCount = await query.CountAsync();
-        
-        var invoices = await query
-            .Skip(skip)
-            .Take(pageSize)
-            .Select(i => new InvoiceSummaryDto
-            {
-                InvoiceID = i.InvoiceID,
-                VehicleID = i.VehicleID,
-                InvoiceNumber = i.InvoiceNumber,
-                InvoiceDate = i.InvoiceDate,
-                TotalCost = i.TotalCost,
-                TotalPartsCost = i.TotalPartsCost,
-                TotalLaborCost = i.TotalLaborCost,
-                ConfidenceScore = i.ConfidenceScore,
-                CreatedAt = i.CreatedAt,
-                Approved = i.Approved,
-                ApprovedAt = i.ApprovedAt,
-                ApprovedBy = i.ApprovedBy,
-                LineItemCount = i.InvoiceLines.Count()
-            })
-            .ToListAsync();
+    var totalCount = await query.CountAsync();
 
-        return new PaginatedResult<InvoiceSummaryDto>
+    var invoices = await query
+        .Skip(skip)
+        .Take(pageSize)
+        .Select(i => new InvoiceSummaryDto
         {
-            Items = invoices,
-            TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize
-        };
-    }
+            InvoiceID = i.InvoiceID,
+            VehicleID = i.VehicleID,
+            InvoiceNumber = i.InvoiceNumber,
+            InvoiceDate = i.InvoiceDate,
+            TotalCost = i.TotalCost,
+            TotalPartsCost = i.TotalPartsCost,
+            TotalLaborCost = i.TotalLaborCost,
+            ConfidenceScore = i.ConfidenceScore,
+            CreatedAt = i.CreatedAt,
+            Approved = i.Approved,
+            ApprovedAt = i.ApprovedAt,
+            ApprovedBy = i.ApprovedBy,
+            LineItemCount = i.InvoiceLines.Count(),
+            LineItems = i.InvoiceLines.OrderBy(l => l.LineNumber).Select(l => new InvoiceLineDto
+            {
+                LineID = l.LineID,
+                LineNumber = l.LineNumber,
+                Description = l.Description,
+                UnitCost = l.UnitCost,
+                Quantity = l.Quantity,
+                TotalLineCost = l.TotalLineCost,
+                PartNumber = l.PartNumber,
+                Category = l.Category,
+                ConfidenceScore = l.ConfidenceScore
+            }).OrderBy(l => l.LineNumber).ToList()
+        })
+        .ToListAsync();
+
+    return new PaginatedResult<InvoiceSummaryDto>
+    {
+        Items = invoices,
+        TotalCount = totalCount,
+        PageNumber = page,
+        PageSize = pageSize
+    };
+}
 
     public async Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId)
     {
@@ -375,93 +388,127 @@ public class InvoiceProcessingService : IInvoiceProcessingService
     }
     }
 
-    public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20)
-    {
-        pageSize = Math.Min(pageSize, 100);
-        var skip = (page - 1) * pageSize;
+public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20)
+{
+    page = Math.Max(page, 1); // Ensure page >= 1
+    pageSize = Math.Clamp(pageSize, 1, 100); // Enforce [1,100]
+    var skip = (page - 1) * pageSize;
 
-        var query = _context.InvoiceHeaders
-            .AsNoTracking()
-            .Where(i => i.VehicleID == vehicleId)
-            .OrderByDescending(i => i.InvoiceDate)
-            .ThenByDescending(i => i.CreatedAt);
+    var query = _context.InvoiceHeaders        
+        .AsNoTracking()
+        .Where(i => i.VehicleID == vehicleId)
+        .OrderByDescending(i => i.CreatedAt);
 
-        var totalCount = await query.CountAsync();
-        
-        var invoices = await query
-            .Skip(skip)
-            .Take(pageSize)
-            .Select(i => new InvoiceSummaryDto
-            {
-                InvoiceID = i.InvoiceID,
-                VehicleID = i.VehicleID,
-                InvoiceNumber = i.InvoiceNumber,
-                InvoiceDate = i.InvoiceDate,
-                TotalCost = i.TotalCost,
-                TotalPartsCost = i.TotalPartsCost,
-                TotalLaborCost = i.TotalLaborCost,
-                ConfidenceScore = i.ConfidenceScore,
-                CreatedAt = i.CreatedAt,
-                Approved = i.Approved,
-                ApprovedAt = i.ApprovedAt,
-                ApprovedBy = i.ApprovedBy,
-                LineItemCount = i.InvoiceLines.Count()
-            })
-            .ToListAsync();
+    var totalCount = await query.CountAsync();
 
-        return new PaginatedResult<InvoiceSummaryDto>
+    var invoices = await query
+        .Skip(skip)
+        .Take(pageSize)
+        .Select(i => new InvoiceSummaryDto
         {
-            Items = invoices,
-            TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize
-        };
-    }
+            InvoiceID = i.InvoiceID,
+            VehicleID = i.VehicleID,
+            InvoiceNumber = i.InvoiceNumber,
+            InvoiceDate = i.InvoiceDate,
+            TotalCost = i.TotalCost,
+            TotalPartsCost = i.TotalPartsCost,
+            TotalLaborCost = i.TotalLaborCost,
+            ConfidenceScore = i.ConfidenceScore,
+            CreatedAt = i.CreatedAt,
+            Approved = i.Approved,
+            ApprovedAt = i.ApprovedAt,
+            ApprovedBy = i.ApprovedBy,
+            LineItemCount = i.InvoiceLines.Count(),
 
-    public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20)
+            LineItems = i.InvoiceLines
+                .OrderBy(l => l.LineNumber)
+                .Select(l => new InvoiceLineDto
+                {
+                    LineID = l.LineID,
+                    LineNumber = l.LineNumber,
+                    Description = l.Description,
+                    UnitCost = l.UnitCost,
+                    Quantity = l.Quantity,
+                    TotalLineCost = l.TotalLineCost,
+                    PartNumber = l.PartNumber,
+                    Category = l.Category,
+                    ConfidenceScore = l.ConfidenceScore
+                })
+                .ToList()
+        })
+        .ToListAsync();
+
+    return new PaginatedResult<InvoiceSummaryDto>
     {
-        pageSize = Math.Min(pageSize, 100);
-        var skip = (page - 1) * pageSize;
+        Items = invoices,
+        TotalCount = totalCount,
+        PageNumber = page,
+        PageSize = pageSize
+    };
+}
 
-        var startDate = date.Date;
-        var endDate = startDate.AddDays(1);
+public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20)
+{
+    page = Math.Max(1, page);
+    pageSize = Math.Clamp(pageSize, 1, 100); // Enforce [1,100]
+    var skip = (page - 1) * pageSize;
+    
+    // Create date range for the entire day
+    var startOfDay = date.Date;
+    var endOfDay = startOfDay.AddDays(1);
 
-        var query = _context.InvoiceHeaders
-            .AsNoTracking()
-            .Where(i => i.CreatedAt >= startDate && i.CreatedAt < endDate)
-            .OrderByDescending(i => i.CreatedAt);
+    var query = _context.InvoiceHeaders       
+        .AsNoTracking()
+        .Where(i => i.InvoiceDate >= startOfDay && i.InvoiceDate < endOfDay)
+        .OrderByDescending(i => i.CreatedAt);
 
-        var totalCount = await query.CountAsync();
-        
-        var invoices = await query
-            .Skip(skip)
-            .Take(pageSize)
-            .Select(i => new InvoiceSummaryDto
-            {
-                InvoiceID = i.InvoiceID,
-                VehicleID = i.VehicleID,
-                InvoiceNumber = i.InvoiceNumber,
-                InvoiceDate = i.InvoiceDate,
-                TotalCost = i.TotalCost,
-                TotalPartsCost = i.TotalPartsCost,
-                TotalLaborCost = i.TotalLaborCost,
-                ConfidenceScore = i.ConfidenceScore,
-                CreatedAt = i.CreatedAt,
-                Approved = i.Approved,
-                ApprovedAt = i.ApprovedAt,
-                ApprovedBy = i.ApprovedBy,
-                LineItemCount = i.InvoiceLines.Count()
-            })
-            .ToListAsync();
+    var totalCount = await query.CountAsync();
 
-        return new PaginatedResult<InvoiceSummaryDto>
+    var invoices = await query
+        .Skip(skip)
+        .Take(pageSize)
+        .Select(i => new InvoiceSummaryDto
         {
-            Items = invoices,
-            TotalCount = totalCount,
-            PageNumber = page,
-            PageSize = pageSize
-        };
-    }
+            InvoiceID = i.InvoiceID,
+            VehicleID = i.VehicleID,
+            InvoiceNumber = i.InvoiceNumber,
+            InvoiceDate = i.InvoiceDate,
+            TotalCost = i.TotalCost,
+            TotalPartsCost = i.TotalPartsCost,
+            TotalLaborCost = i.TotalLaborCost,
+            ConfidenceScore = i.ConfidenceScore,
+            CreatedAt = i.CreatedAt,
+            Approved = i.Approved,
+            ApprovedAt = i.ApprovedAt,
+            ApprovedBy = i.ApprovedBy,
+            LineItemCount = i.InvoiceLines.Count(),
+
+            LineItems = i.InvoiceLines
+                .OrderBy(l => l.LineNumber)
+                .Select(l => new InvoiceLineDto
+                {
+                    LineID = l.LineID,
+                    LineNumber = l.LineNumber,
+                    Description = l.Description,
+                    UnitCost = l.UnitCost,
+                    Quantity = l.Quantity,
+                    TotalLineCost = l.TotalLineCost,
+                    PartNumber = l.PartNumber,
+                    Category = l.Category,
+                    ConfidenceScore = l.ConfidenceScore
+                })
+                .ToList()
+        })
+        .ToListAsync();
+
+    return new PaginatedResult<InvoiceSummaryDto>
+    {
+        Items = invoices,
+        TotalCount = totalCount,
+        PageNumber = page,
+        PageSize = pageSize
+    };
+}
 
     public async Task<string> GetSecureFileUrlAsync(int invoiceId, string? userIdentifier = null)
     {
