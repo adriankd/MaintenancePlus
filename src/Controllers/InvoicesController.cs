@@ -196,6 +196,40 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieve invoices uploaded on a specific date
+    /// </summary>
+    /// <param name="date">Date in YYYY-MM-DD format</param>
+    /// <param name="page">Page number (default: 1)</param>
+    /// <param name="pageSize">Items per page (default: 20, max: 100)</param>
+    /// <returns>Paginated list of invoices uploaded on the date</returns>
+    [HttpGet("uploaded-date/{date:datetime}")]
+    [ProducesResponseType(typeof(PaginatedResult<InvoiceSummaryDto>), 200)]
+    [ProducesResponseType(typeof(string), 400)]
+    public async Task<IActionResult> GetInvoicesByUploadedDate(DateTime date, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            if (page < 1)
+            {
+                return BadRequest("Page number must be greater than 0");
+            }
+
+            if (pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest("Page size must be between 1 and 100");
+            }
+
+            var result = await _invoiceService.GetInvoicesByUploadedDateAsync(date, page, pageSize);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving invoices for uploaded date {Date}", date);
+            return StatusCode(500, "An error occurred while retrieving invoices");
+        }
+    }
+
+    /// <summary>
     /// Access original invoice file from blob storage
     /// </summary>
     /// <param name="id">Invoice ID</param>
