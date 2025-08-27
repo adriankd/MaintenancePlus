@@ -82,4 +82,112 @@ public class GitHubModelsServiceTests
         var result = await service.ProcessInvoiceComprehensivelyAsync(input);
         result.Success.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task ProcessInvoiceComprehensivelyAsync_Should_Handle_Rate_Limit_Error()
+    {
+        // Arrange: underlying call returns 429 which service maps to a friendly string containing "Rate limit"
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+        {
+            Content = new StringContent("{\"error\":\"limit\"}", Encoding.UTF8, "application/json")
+        });
+        var client = new HttpClient(handler);
+        var logger = NullLogger<GitHubModelsService>.Instance;
+        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["GitHubModels:ApiToken"] = "dummy"
+        }).Build();
+        var service = new GitHubModelsService(client, logger, cfg);
+
+        // Act
+        var result = await service.ProcessInvoiceComprehensivelyAsync("{\"Content\":\"x\"}");
+
+        // Assert
+        result.Success.Should().BeFalse();
+        result.RateLimitEncountered.Should().BeTrue();
+        result.ProcessingMethod.Should().Be("GPT4o-RateLimited");
+    }
+
+    [Fact]
+    public async Task ProcessInvoiceComprehensivelyAsync_Should_Return_JsonError_On_Invalid_Json()
+    {
+        var invalid = "```json\n{ invalid json }\n```";
+        var service = CreateServiceReturning(invalid);
+        var res = await service.ProcessInvoiceComprehensivelyAsync("{\"Content\":\"y\"}");
+        res.Success.Should().BeFalse();
+        res.ProcessingMethod.Should().Be("GPT4o-JsonError");
+        res.ErrorMessage.Should().Contain("Invalid JSON");
+        res.ProcessingNotes.Should().NotBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "Authentication failed")]
+    [InlineData(HttpStatusCode.PaymentRequired, "quota exceeded")]
+    [InlineData(HttpStatusCode.RequestEntityTooLarge, "payload too large")]
+    public async Task ProcessInvoiceTextAsync_Maps_Common_Http_Errors(HttpStatusCode status, string expected)
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(status)
+        {
+            Content = new StringContent("problem", Encoding.UTF8, "text/plain")
+        });
+        var client = new HttpClient(handler);
+        var logger = NullLogger<GitHubModelsService>.Instance;
+        var cfg = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["GitHubModels:ApiToken"] = "dummy"
+        }).Build();
+        var service = new GitHubModelsService(client, logger, cfg);
+
+        var msg = await service.ProcessInvoiceTextAsync("x", "p");
+        msg.ToLowerInvariant().Should().Contain(expected.ToLowerInvariant());
+    }
+
+    [Fact]
+    public async Task EnhanceInvoiceDataAsync_Returns_Text_Mode_When_Not_Json()
+    {
+        var service = CreateServiceReturning("hello world");
+        var result = await service.EnhanceInvoiceDataAsync("{\"Content\":\"z\"}");
+        result.Success.Should().BeTrue();
+        result.EnhancedData.Should().ContainKey("analysis");
+        result.ConfidenceScore.Should().BeGreaterThan(70);
+    }
+
+    [Fact]
+    public async Task EnhanceInvoiceDataAsync_Parses_Json_And_Sets_Confidence()
+    {
+        var json = "{\"foo\":1}";
+        var service = CreateServiceReturning(json);
+        var result = await service.EnhanceInvoiceDataAsync("{\"Content\":\"z\"}");
+        result.Success.Should().BeTrue();
+        result.EnhancedData.Should().ContainKey("foo");
+        result.ConfidenceScore.Should().Be(85.0);
+    }
+
+    [Fact]
+    public async Task TestConnectionAsync_Returns_True_When_Response_Contains_Marker()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new
+            {
+                choices = new[]
+                {
+                    new { message = new { content = "Connection successful" } }
+                }
+            }), Encoding.UTF8, "application/json")
+        });
+        var client = new HttpClient(handler);
+        var service = new GitHubModelsService(client, NullLogger<GitHubModelsService>.Instance,
+            new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>{["GitHubModels:ApiToken"]="dummy"}).Build());
+        (await service.TestConnectionAsync()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ProcessInvoiceComprehensivelyAsync_Parses_Json_From_Unspecified_Code_Block()
+    {
+        var fenced = "```\n{\n \"success\": true, \"lineItems\": []\n}\n```";
+        var service = CreateServiceReturning(fenced);
+        var result = await service.ProcessInvoiceComprehensivelyAsync("{\"Content\":\"z\"}");
+        result.Success.Should().BeTrue();
+    }
 }
