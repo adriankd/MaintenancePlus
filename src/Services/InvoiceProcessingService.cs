@@ -679,13 +679,6 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
                 return string.Empty;
             }
 
-            // Enforce approval-only access to files per PRD
-            if (!invoice.Approved)
-            {
-                _logger.LogWarning("Invoice {InvoiceId} is not approved; denying file access", invoiceId);
-                return string.Empty;
-            }
-
             if (string.IsNullOrEmpty(invoice.BlobFileUrl))
             {
                 _logger.LogWarning("Invoice {InvoiceId} has no blob file URL", invoiceId);
