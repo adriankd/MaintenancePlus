@@ -27,7 +27,7 @@ public class InvoicesControllerTests
     {
         var svc = Substitute.For<IInvoiceProcessingService>();
         svc.ProcessInvoiceAsync(Arg.Any<IFormFile>())
-            .Returns(new InvoiceProcessingResponse { Success = true, InvoiceId = 123 });
+            .Returns(Task.FromResult(new InvoiceProcessingResponse { Success = true, InvoiceId = 123 }));
 
         var controller = new InvoicesController(svc, NullLogger<InvoicesController>.Instance);
 

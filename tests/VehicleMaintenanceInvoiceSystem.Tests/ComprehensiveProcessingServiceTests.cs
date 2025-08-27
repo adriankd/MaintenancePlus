@@ -21,11 +21,11 @@ public class ComprehensiveProcessingServiceTests
     public async Task Uses_GPT_Result_And_Fills_Missing_From_FR()
     {
         var (svc, gh, fb) = Create();
-        gh.ProcessInvoiceComprehensivelyAsync(Arg.Any<string>()).Returns(new ComprehensiveInvoiceProcessingResult
+    gh.ProcessInvoiceComprehensivelyAsync(Arg.Any<string>()).Returns(Task.FromResult(new ComprehensiveInvoiceProcessingResult
         {
             Success = true,
             LineItems = new List<ProcessedLineItem>()
-        });
+    }));
 
         var fr = new InvoiceData
         {
@@ -54,16 +54,16 @@ public class ComprehensiveProcessingServiceTests
     public async Task Falls_Back_On_Rate_Limit()
     {
         var (svc, gh, fb) = Create();
-        gh.ProcessInvoiceComprehensivelyAsync(Arg.Any<string>()).Returns(new ComprehensiveInvoiceProcessingResult
+    gh.ProcessInvoiceComprehensivelyAsync(Arg.Any<string>()).Returns(Task.FromResult(new ComprehensiveInvoiceProcessingResult
         {
             Success = false,
             RateLimitEncountered = true,
             ErrorMessage = "Rate limit"
-        });
-        fb.ProcessInvoiceAsync(Arg.Any<string>(), Arg.Any<InvoiceData>()).Returns(new ComprehensiveInvoiceProcessingResult
+    }));
+    fb.ProcessInvoiceAsync(Arg.Any<string>(), Arg.Any<InvoiceData>()).Returns(Task.FromResult(new ComprehensiveInvoiceProcessingResult
         {
             Success = true
-        });
+    }));
 
         var res = await svc.ProcessInvoiceComprehensivelyAsync("{}", new InvoiceData{ LineItems = new() });
         res.Success.Should().BeTrue();
@@ -74,15 +74,15 @@ public class ComprehensiveProcessingServiceTests
     public async Task Falls_Back_On_Failure()
     {
         var (svc, gh, fb) = Create();
-        gh.ProcessInvoiceComprehensivelyAsync(Arg.Any<string>()).Returns(new ComprehensiveInvoiceProcessingResult
+    gh.ProcessInvoiceComprehensivelyAsync(Arg.Any<string>()).Returns(Task.FromResult(new ComprehensiveInvoiceProcessingResult
         {
             Success = false,
             ErrorMessage = "boom"
-        });
-        fb.ProcessInvoiceAsync(Arg.Any<string>(), Arg.Any<InvoiceData>()).Returns(new ComprehensiveInvoiceProcessingResult
+    }));
+    fb.ProcessInvoiceAsync(Arg.Any<string>(), Arg.Any<InvoiceData>()).Returns(Task.FromResult(new ComprehensiveInvoiceProcessingResult
         {
             Success = true
-        });
+    }));
 
         var res = await svc.ProcessInvoiceComprehensivelyAsync("{}", new InvoiceData{ LineItems = new() });
         res.Success.Should().BeTrue();
