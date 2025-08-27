@@ -30,11 +30,14 @@ public class HomeController : Controller
             var totalsAll = await _invoiceService.GetProcessedInvoicesAsync(1, 1, "all");
             ViewBag.TotalInvoices = totalsAll.TotalCount;
 
-            // Existing metrics remain based on approved-only list for now
+            // Existing metrics: Approved + TotalValue can use approved-only list
             var allInvoices = await _invoiceService.GetInvoicesAsync(1, 1000);
             var approvedCount = allInvoices.Items.Count(i => i.Approved);
-            var pendingCount = allInvoices.Items.Count(i => !i.Approved);
             var totalValue = allInvoices.Items.Sum(i => i.TotalCost);
+
+            // Pending should reflect unapproved invoices across the whole dataset
+            var totalsUnapproved = await _invoiceService.GetProcessedInvoicesAsync(1, 1, "unapproved");
+            var pendingCount = totalsUnapproved.TotalCount;
 
             ViewBag.ApprovedInvoices = approvedCount;
             ViewBag.PendingInvoices = pendingCount;

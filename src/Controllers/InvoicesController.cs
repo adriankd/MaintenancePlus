@@ -203,10 +203,7 @@ public class InvoicesController : ControllerBase
     /// <param name="page">Page number (default: 1)</param>
     /// <param name="pageSize">Items per page (default: 20, max: 100)</param>
     /// <returns>Paginated list of invoices for the date</returns>
-    // Keep existing route for backward compatibility
     [HttpGet("date/{date:datetime}")]
-    // Add clearer alias
-    [HttpGet("invoice-date/{date:datetime}")]
     [ProducesResponseType(typeof(PaginatedResult<InvoiceSummaryDto>), 200)]
     [ProducesResponseType(typeof(string), 400)]
     public async Task<IActionResult> GetInvoicesByDate(DateTime date, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
@@ -241,9 +238,6 @@ public class InvoicesController : ControllerBase
     /// <param name="pageSize">Items per page (default: 20, max: 100)</param>
     /// <returns>Paginated list of invoices uploaded on the date</returns>
     [HttpGet("uploaded-date/{date:datetime}")]
-    // Friendly aliases to reduce confusion
-    [HttpGet("created-date/{date:datetime}")]
-    [HttpGet("created/{date:datetime}")]
     [ProducesResponseType(typeof(PaginatedResult<InvoiceSummaryDto>), 200)]
     [ProducesResponseType(typeof(string), 400)]
     public async Task<IActionResult> GetInvoicesByUploadedDate(DateTime date, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
