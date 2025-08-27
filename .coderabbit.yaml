@@ -108,11 +108,6 @@ auto_approve:
   - path: "*.md"
     conditions:
       - no_code_changes: true
-  
-  # Auto-approve minor configuration changes
-  - path: ".gitignore"
-    conditions:
-      - lines_changed: < 10
 
 # Integration settings
 integrations:

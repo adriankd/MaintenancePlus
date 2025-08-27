@@ -80,12 +80,12 @@ namespace VehicleMaintenanceInvoiceSystem.Services
                 var response = await _httpClient.PostAsync($"{_baseUrl}/chat/completions", content);
                 var responseContent = await response.Content.ReadAsStringAsync();
                 
-                _logger.LogInformation("GitHub Models API response: Status={Status}, Content={Content}", 
-                                     response.StatusCode, responseContent.Length > 200 ? responseContent[..200] + "..." : responseContent);
+                _logger.LogInformation("GitHub Models API response: Status={Status}, ContentLength={Length}", 
+                                     response.StatusCode, responseContent?.Length ?? 0);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseContent ?? string.Empty);
                     
                     if (result.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                     {
@@ -280,15 +280,13 @@ REQUIRED JSON RESPONSE FORMAT:
 Simplified Invoice Data:
 " + simplifiedData;
 
-                // Log the full prompt being sent to GPT-4o for debugging
-                _logger.LogInformation("GPT-4o Prompt being sent (length: {PromptLength} chars):\n{Prompt}", 
-                    prompt.Length, prompt);
+                // Avoid logging full prompt to limit PII exposure; log only length at Debug
+                _logger.LogDebug("GPT-4o prompt length: {PromptLength} chars", prompt.Length);
 
                 var result = await ProcessInvoiceTextAsync(simplifiedData, prompt);
                 
-                // Log the GPT-4o response for debugging classification issues
-                _logger.LogInformation("GPT-4o Response received (length: {ResponseLength} chars):\n{Response}", 
-                    result?.Length ?? 0, result);
+                // Avoid logging full response to limit PII exposure; log only length at Debug
+                _logger.LogDebug("GPT-4o response length: {ResponseLength} chars", result?.Length ?? 0);
                 
                 if (string.IsNullOrEmpty(result))
                 {
@@ -318,10 +316,9 @@ Simplified Invoice Data:
                 {
                     var cleanedResult = ExtractJsonFromMarkdown(result);
                     
-                    // Log the cleaned result for debugging
-                    _logger.LogInformation("Attempting to parse cleaned JSON response (length: {Length} chars): {CleanedResult}", 
-                        cleanedResult?.Length ?? 0, 
-                        cleanedResult?.Length > 200 ? cleanedResult[..200] + "..." : cleanedResult);
+                    // Log the cleaned result length at Debug (avoid dumping content to limit PII exposure)
+                    _logger.LogDebug("Attempting to parse cleaned JSON (length: {Length} chars)", 
+                        cleanedResult?.Length ?? 0);
                     
                     if (string.IsNullOrWhiteSpace(cleanedResult))
                     {
@@ -406,16 +403,16 @@ Simplified Invoice Data:
                 {
                     var cleanedResult = result != null ? ExtractJsonFromMarkdown(result) : null;
                     
-                    _logger.LogError(jsonEx, "Failed to parse GPT-4o JSON response. Original response length: {OriginalLength}, Cleaned response length: {CleanedLength}", 
+                    _logger.LogWarning(jsonEx, "Failed to parse GPT-4o JSON response. Original response length: {OriginalLength}, Cleaned response length: {CleanedLength}", 
                         result?.Length ?? 0, 
                         cleanedResult?.Length ?? 0);
                     
-                    // Log the first 1000 characters of both original and cleaned responses for debugging
-                    var originalSample = result?.Length > 1000 ? result[..1000] + "..." : result;
-                    var cleanedSample = cleanedResult?.Length > 1000 ? cleanedResult[..1000] + "..." : cleanedResult;
+                    // Log reduced-size samples at Debug to limit PII exposure and log volume
+                    var originalSample = result?.Length > 300 ? result[..300] + "..." : result;
+                    var cleanedSample = cleanedResult?.Length > 300 ? cleanedResult[..300] + "..." : cleanedResult;
                     
-                    _logger.LogError("Original response sample: {OriginalSample}", originalSample);
-                    _logger.LogError("Cleaned response sample: {CleanedSample}", cleanedSample);
+                    _logger.LogDebug("Original response sample: {OriginalSample}", originalSample);
+                    _logger.LogDebug("Cleaned response sample: {CleanedSample}", cleanedSample);
                     
                     return new ComprehensiveInvoiceProcessingResult
                     {

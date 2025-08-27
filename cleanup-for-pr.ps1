@@ -64,20 +64,20 @@ $errorCount = 0
 function Remove-SafeFile {
     param($filePath, $description)
     
-    if (Test-Path $filePath) {
+    if (Test-Path -LiteralPath $filePath) {
         try {
-            Remove-Item $filePath -Force
+            Remove-Item -LiteralPath $filePath -Force -ErrorAction Stop
             Write-Host "  ✅ Removed: $description" -ForegroundColor DarkGreen
-            return $true
+            return 'Removed'
         }
         catch {
             Write-Host "  ❌ Failed to remove: $description - $($_.Exception.Message)" -ForegroundColor Red
-            return $false
+            return 'Failed'
         }
     }
     else {
         Write-Host "  ⚪ Not found: $description" -ForegroundColor DarkGray
-        return $false
+        return 'NotFound'
     }
 }
 
@@ -85,56 +85,66 @@ function Remove-SafeFile {
 function Remove-SafeDirectory {
     param($dirPath, $description)
     
-    if (Test-Path $dirPath) {
+    if (Test-Path -LiteralPath $dirPath) {
         try {
-            Remove-Item $dirPath -Recurse -Force
+            Remove-Item -LiteralPath $dirPath -Recurse -Force -ErrorAction Stop
             Write-Host "  ✅ Removed directory: $description" -ForegroundColor DarkGreen
-            return $true
+            return 'Removed'
         }
         catch {
             Write-Host "  ❌ Failed to remove directory: $description - $($_.Exception.Message)" -ForegroundColor Red
-            return $false
+            return 'Failed'
         }
     }
     else {
         Write-Host "  ⚪ Directory not found: $description" -ForegroundColor DarkGray
-        return $false
+        return 'NotFound'
     }
 }
 
 Write-Host "`n📁 Removing test PowerShell scripts..." -ForegroundColor Yellow
 foreach ($file in $testPowerShellFiles) {
     $fullPath = Join-Path $projectRoot $file
-    if (Remove-SafeFile $fullPath $file) { $removedCount++ }
-    else { $errorCount++ }
+    switch (Remove-SafeFile $fullPath $file) {
+        'Removed' { $removedCount++ }
+        'Failed'  { $errorCount++ }
+    }
 }
 
 Write-Host "`n🔧 Removing test C# files..." -ForegroundColor Yellow
 foreach ($file in $testCSharpFiles) {
     $fullPath = Join-Path $projectRoot $file
-    if (Remove-SafeFile $fullPath $file) { $removedCount++ }
-    else { $errorCount++ }
+    switch (Remove-SafeFile $fullPath $file) {
+        'Removed' { $removedCount++ }
+        'Failed'  { $errorCount++ }
+    }
 }
 
 Write-Host "`n🗂️ Removing temporary files..." -ForegroundColor Yellow
 foreach ($file in $tempFiles) {
     $fullPath = Join-Path $projectRoot $file
-    if (Remove-SafeFile $fullPath $file) { $removedCount++ }
-    else { $errorCount++ }
+    switch (Remove-SafeFile $fullPath $file) {
+        'Removed' { $removedCount++ }
+        'Failed'  { $errorCount++ }
+    }
 }
 
 Write-Host "`n📦 Removing archive files..." -ForegroundColor Yellow
 foreach ($file in $archiveFiles) {
     $fullPath = Join-Path $projectRoot $file
-    if (Remove-SafeFile $fullPath $file) { $removedCount++ }
-    else { $errorCount++ }
+    switch (Remove-SafeFile $fullPath $file) {
+        'Removed' { $removedCount++ }
+        'Failed'  { $errorCount++ }
+    }
 }
 
 Write-Host "`n📂 Removing test directories..." -ForegroundColor Yellow
 foreach ($dir in $testDirectories) {
     $fullPath = Join-Path $projectRoot $dir
-    if (Remove-SafeDirectory $fullPath $dir) { $removedCount++ }
-    else { $errorCount++ }
+    switch (Remove-SafeDirectory $fullPath $dir) {
+        'Removed' { $removedCount++ }
+        'Failed'  { $errorCount++ }
+    }
 }
 
 Write-Host "`n📊 Cleanup Summary:" -ForegroundColor Cyan
@@ -146,7 +156,7 @@ if ($removedCount -gt 0) {
     Write-Host "`n📋 Next steps:" -ForegroundColor Cyan
     Write-Host "  1. Review the changes: git status" -ForegroundColor White
     Write-Host "  2. Commit cleanup if needed: git add -A && git commit -m 'Clean up test files and development artifacts'" -ForegroundColor White
-    Write-Host "  3. Push changes: git push origin feature/api-security-and-fixes" -ForegroundColor White
+    Write-Host "  3. Push changes: git push origin feature/fallback-classification-fixes" -ForegroundColor White
     Write-Host "  4. Create PR on GitHub" -ForegroundColor White
 } else {
     Write-Host "`n✨ Repository was already clean!" -ForegroundColor Green
