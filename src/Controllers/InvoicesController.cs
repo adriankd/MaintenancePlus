@@ -197,13 +197,16 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieve invoices processed on a specific date
+    /// Retrieve invoices by invoice date (the date on the invoice document)
     /// </summary>
     /// <param name="date">Date in YYYY-MM-DD format</param>
     /// <param name="page">Page number (default: 1)</param>
     /// <param name="pageSize">Items per page (default: 20, max: 100)</param>
     /// <returns>Paginated list of invoices for the date</returns>
+    // Keep existing route for backward compatibility
     [HttpGet("date/{date:datetime}")]
+    // Add clearer alias
+    [HttpGet("invoice-date/{date:datetime}")]
     [ProducesResponseType(typeof(PaginatedResult<InvoiceSummaryDto>), 200)]
     [ProducesResponseType(typeof(string), 400)]
     public async Task<IActionResult> GetInvoicesByDate(DateTime date, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
@@ -231,13 +234,16 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieve invoices uploaded on a specific date
+    /// Retrieve invoices by upload date (CreatedAt, when the system processed the invoice)
     /// </summary>
     /// <param name="date">Date in YYYY-MM-DD format</param>
     /// <param name="page">Page number (default: 1)</param>
     /// <param name="pageSize">Items per page (default: 20, max: 100)</param>
     /// <returns>Paginated list of invoices uploaded on the date</returns>
     [HttpGet("uploaded-date/{date:datetime}")]
+    // Friendly aliases to reduce confusion
+    [HttpGet("created-date/{date:datetime}")]
+    [HttpGet("created/{date:datetime}")]
     [ProducesResponseType(typeof(PaginatedResult<InvoiceSummaryDto>), 200)]
     [ProducesResponseType(typeof(string), 400)]
     public async Task<IActionResult> GetInvoicesByUploadedDate(DateTime date, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
