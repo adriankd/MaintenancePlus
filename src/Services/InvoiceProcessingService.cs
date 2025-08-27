@@ -250,8 +250,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
     page = Math.Max(page, 1);
     var skip = (page - 1) * pageSize;
 
-    var query = _context.InvoiceHeaders        
+    var query = _context.InvoiceHeaders
         .AsNoTracking()
+        .Where(i => i.Approved)
         .OrderByDescending(i => i.CreatedAt);
 
     var totalCount = await query.CountAsync();
@@ -310,7 +311,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
             var invoice = await _context.InvoiceHeaders
                 .AsNoTracking()
                 .Include(i => i.InvoiceLines)
-                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId && i.Approved);
 
             if (invoice == null)
             {
@@ -397,9 +398,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
     pageSize = Math.Clamp(pageSize, 1, 100); // Enforce [1,100]
     var skip = (page - 1) * pageSize;
 
-    var query = _context.InvoiceHeaders        
+    var query = _context.InvoiceHeaders
         .AsNoTracking()
-        .Where(i => i.VehicleID == vehicleId)
+        .Where(i => i.VehicleID == vehicleId && i.Approved)
         .OrderByDescending(i => i.CreatedAt);
 
     var totalCount = await query.CountAsync();
@@ -462,9 +463,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
     var startOfDay = date.Date;
     var endOfDay = startOfDay.AddDays(1);
 
-    var query = _context.InvoiceHeaders       
+    var query = _context.InvoiceHeaders
         .AsNoTracking()
-        .Where(i => i.InvoiceDate >= startOfDay && i.InvoiceDate < endOfDay)
+        .Where(i => i.InvoiceDate >= startOfDay && i.InvoiceDate < endOfDay && i.Approved)
         .OrderByDescending(i => i.CreatedAt);
 
     var totalCount = await query.CountAsync();
@@ -529,7 +530,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
 
         var query = _context.InvoiceHeaders
             .AsNoTracking()
-            .Where(i => i.CreatedAt >= startOfDay && i.CreatedAt < endOfDay)
+            .Where(i => i.CreatedAt >= startOfDay && i.CreatedAt < endOfDay && i.Approved)
             .OrderByDescending(i => i.CreatedAt);
 
         var totalCount = await query.CountAsync();
@@ -597,6 +598,13 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
             if (invoice == null)
             {
                 _logger.LogWarning("Invoice {InvoiceId} not found for file access request", invoiceId);
+                return string.Empty;
+            }
+
+            // Enforce approval-only access to files per PRD
+            if (!invoice.Approved)
+            {
+                _logger.LogWarning("Invoice {InvoiceId} is not approved; denying file access", invoiceId);
                 return string.Empty;
             }
 
@@ -939,7 +947,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
         try
         {
             var invoice = await _context.InvoiceHeaders
-                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId);
+                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId && i.Approved);
 
             if (invoice?.ExtractedData == null)
             {
