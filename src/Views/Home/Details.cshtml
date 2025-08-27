@@ -42,14 +42,9 @@
                     <a href="@Url.Action("Invoices", "Home")" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-2"></i>Back to List
                     </a>
-                    <div class="btn-group" role="group">
-                        <a href="/api/invoices/@Model.InvoiceID/file" target="_blank" class="btn btn-primary">
-                            <i class="fas fa-eye me-2"></i>View Original
-                        </a>
-                        <a href="/api/invoices/@Model.InvoiceID/file" download class="btn btn-outline-primary">
-                            <i class="fas fa-download me-2"></i>Download
-                        </a>
-                    </div>
+                    <a href="/api/invoices/@Model.InvoiceID/file" target="_blank" class="btn btn-outline-primary">
+                        <i class="fas fa-download me-2"></i>View Original
+                    </a>
                     
                     @* Approval Controls *@
                     @if (!Model.Approved)
@@ -119,14 +114,6 @@
                                 <tr>
                                     <td><strong>Total Cost:</strong></td>
                                     <td><h5 class="text-success mb-0">$@Model.TotalCost.ToString("N2")</h5></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Parts Cost:</strong></td>
-                                    <td><span class="fs-5">$@Model.TotalPartsCost.ToString("N2")</span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Labor Cost:</strong></td>
-                                    <td><span class="fs-5">$@Model.TotalLaborCost.ToString("N2")</span></td>
                                 </tr>
                                 @if (Model.ConfidenceScore.HasValue)
                                 {

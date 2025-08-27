@@ -241,9 +241,6 @@ namespace VehicleMaintenanceInvoiceSystem.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETUTCDATE()");
 
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<string>("ExtractedData")
                         .HasColumnType("nvarchar(max)");
 

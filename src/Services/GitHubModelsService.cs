@@ -234,16 +234,6 @@ CRITICAL INSTRUCTIONS:
 🔧 LABOR = Any work performed by technicians (services, installations, replacements)
 📦 PART = Physical items/products being sold (the actual part itself)
 
-*** MANDATORY CLASSIFICATION DECISIONS ***
-✅ ""Cabin Filter Replacement"" = Labor (NOT Part) - This is WORK to replace the filter
-✅ ""Engine Filter Replacement"" = Labor (NOT Part) - This is WORK to replace the filter  
-✅ ""Oil Change Service"" = Labor (NOT Part) - This is WORK to change oil
-✅ ""Brake Pad Installation"" = Labor (NOT Part) - This is WORK to install pads
-
-📦 ""Cabin Air Filter"" = Part (NOT Labor) - This is the PHYSICAL filter being sold
-📦 ""Engine Oil"" = Part (NOT Labor) - This is the PHYSICAL oil being sold
-📦 ""Brake Pads"" = Part (NOT Labor) - This is the PHYSICAL pads being sold
-
 *** KEYWORD DETECTION RULES ***
 IF description contains: replacement, installation, service, repair, change, maintenance, mount, install, replace → MUST BE Labor
 IF description is just the part name without action words → MUST BE Part
@@ -253,14 +243,6 @@ Tax: Government taxes and fees
 Other: Miscellaneous charges that don't fit above categories
 
 STANDARDIZED DESCRIPTIONS:
-- Oil/fluid services → ""Oil Change Service""
-- Multiple brake items → ""Brake System Service""
-- Engine work → ""Engine Service""
-- Diagnostic work → ""System Diagnostics""
-- Mixed maintenance → ""Routine Maintenance""
-- General service → ""General Service""
-
-REQUIRED JSON RESPONSE FORMAT:
 - Oil/fluid services → ""Oil Change Service""
 - Multiple brake items → ""Brake System Service""
 - Engine work → ""Engine Service""
