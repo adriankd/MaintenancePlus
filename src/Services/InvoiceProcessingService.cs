@@ -12,6 +12,7 @@ public interface IInvoiceProcessingService
 {
     Task<InvoiceProcessingResponse> ProcessInvoiceAsync(IFormFile file);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page = 1, int pageSize = 20);
+    Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(int page = 1, int pageSize = 20, string? status = "all");
     Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20);
@@ -254,6 +255,76 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
         .AsNoTracking()
         .Where(i => i.Approved)
         .OrderByDescending(i => i.CreatedAt);
+
+    var totalCount = await query.CountAsync();
+
+    var invoices = await query
+        .Skip(skip)
+        .Take(pageSize)
+        .Select(i => new InvoiceSummaryDto
+        {
+            InvoiceID = i.InvoiceID,
+            VehicleID = i.VehicleID,
+            Odometer = i.Odometer,
+            InvoiceNumber = i.InvoiceNumber,
+            InvoiceDate = i.InvoiceDate,
+            TotalCost = i.TotalCost,
+            TotalPartsCost = i.TotalPartsCost,
+            TotalLaborCost = i.TotalLaborCost,
+            Description = i.Description,
+            ConfidenceScore = i.ConfidenceScore,
+            CreatedAt = i.CreatedAt,
+            Approved = i.Approved,
+            ApprovedAt = i.ApprovedAt,
+            ApprovedBy = i.ApprovedBy,
+            LineItemCount = i.InvoiceLines.Count(),
+            LineItems = i.InvoiceLines.OrderBy(l => l.LineNumber).Select(l => new InvoiceLineDto
+            {
+                LineID = l.LineID,
+                LineNumber = l.LineNumber,
+                Description = l.Description,
+                UnitCost = l.UnitCost,
+                Quantity = l.Quantity,
+                TotalLineCost = l.TotalLineCost,
+                PartNumber = l.PartNumber,
+                Category = l.Category,
+                ConfidenceScore = l.ExtractionConfidence
+            }).OrderBy(l => l.LineNumber).ToList()
+        })
+        .ToListAsync();
+
+    return new PaginatedResult<InvoiceSummaryDto>
+    {
+        Items = invoices,
+        TotalCount = totalCount,
+        PageNumber = page,
+        PageSize = pageSize
+    };
+}
+
+public async Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(int page = 1, int pageSize = 20, string? status = "all")
+{
+    pageSize = Math.Clamp(pageSize, 1, 100); // Limit page size
+    page = Math.Max(page, 1);
+    var skip = (page - 1) * pageSize;
+
+    var query = _context.InvoiceHeaders
+        .AsNoTracking()
+        .OrderByDescending(i => i.CreatedAt)
+        .AsQueryable();
+
+    // Apply status filter: all (default), approved, unapproved
+    if (!string.IsNullOrWhiteSpace(status))
+    {
+        if (status.Equals("approved", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(i => i.Approved);
+        }
+        else if (status.Equals("unapproved", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(i => !i.Approved);
+        }
+    }
 
     var totalCount = await query.CountAsync();
 

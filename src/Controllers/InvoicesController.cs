@@ -94,6 +94,41 @@ public class InvoicesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieve processed invoices (approved and unapproved) with pagination
+    /// Mirrors /api/Invoices but includes optional status filter
+    /// </summary>
+    /// <param name="page">Page number (default: 1)</param>
+    /// <param name="pageSize">Items per page (default: 20, max: 100)</param>
+    /// <param name="status">Filter by status: all (default), approved, unapproved</param>
+    /// <returns>Paginated list of invoice summaries</returns>
+    [HttpGet("processed-list")]
+    [ProducesResponseType(typeof(PaginatedResult<InvoiceSummaryDto>), 200)]
+    [ProducesResponseType(typeof(string), 400)]
+    public async Task<IActionResult> GetProcessedInvoices([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? status = "all")
+    {
+        try
+        {
+            if (page < 1)
+            {
+                return BadRequest("Page number must be greater than 0");
+            }
+
+            if (pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest("Page size must be between 1 and 100");
+            }
+
+            var result = await _invoiceService.GetProcessedInvoicesAsync(page, pageSize, status);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving processed invoices");
+            return StatusCode(500, "An error occurred while retrieving processed invoices");
+        }
+    }
+
+    /// <summary>
     /// Retrieve a specific invoice with all line items
     /// </summary>
     /// <param name="id">Invoice ID</param>

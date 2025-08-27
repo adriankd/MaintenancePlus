@@ -56,7 +56,8 @@ public class HomeController : Controller
     {
         try
         {
-            var result = await _invoiceService.GetInvoicesAsync(page, 20);
+            // Use processed-list behavior (includes approved and unapproved)
+            var result = await _invoiceService.GetProcessedInvoicesAsync(page, 20, "all");
             return View(result);
         }
         catch (Exception ex)
