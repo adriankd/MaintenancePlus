@@ -26,12 +26,19 @@ public class HomeController : Controller
         try
         {
             // Get KPI data for dashboard
-            var allInvoices = await _invoiceService.GetInvoicesAsync(1, 1000); // Get all invoices for KPIs
+            // Use processed-list endpoint for accurate total count across approved and unapproved
+            var totalsAll = await _invoiceService.GetProcessedInvoicesAsync(1, 1, "all");
+            ViewBag.TotalInvoices = totalsAll.TotalCount;
+
+            // Existing metrics: Approved + TotalValue can use approved-only list
+            var allInvoices = await _invoiceService.GetInvoicesAsync(1, 1000);
             var approvedCount = allInvoices.Items.Count(i => i.Approved);
-            var pendingCount = allInvoices.Items.Count(i => !i.Approved);
             var totalValue = allInvoices.Items.Sum(i => i.TotalCost);
 
-            ViewBag.TotalInvoices = allInvoices.TotalCount;
+            // Pending should reflect unapproved invoices across the whole dataset
+            var totalsUnapproved = await _invoiceService.GetProcessedInvoicesAsync(1, 1, "unapproved");
+            var pendingCount = totalsUnapproved.TotalCount;
+
             ViewBag.ApprovedInvoices = approvedCount;
             ViewBag.PendingInvoices = pendingCount;
             ViewBag.TotalValue = totalValue.ToString("N0");
@@ -56,7 +63,8 @@ public class HomeController : Controller
     {
         try
         {
-            var result = await _invoiceService.GetInvoicesAsync(page, 20);
+            // Use processed-list behavior (includes approved and unapproved)
+            var result = await _invoiceService.GetProcessedInvoicesAsync(page, 20, "all");
             return View(result);
         }
         catch (Exception ex)
@@ -75,7 +83,8 @@ public class HomeController : Controller
         try
         {
             _logger.LogInformation("Attempting to load invoice details for ID: {InvoiceId}", id);
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
+            // Allow viewing unapproved invoices in MVC to keep the system usable without auth
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(id, includeUnapproved: true);
             
             if (invoice == null)
             {
