@@ -42,14 +42,9 @@
                     <a href="@Url.Action("Invoices", "Home")" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-2"></i>Back to List
                     </a>
-                    <div class="btn-group" role="group">
-                        <a href="/api/invoices/@Model.InvoiceID/file" target="_blank" class="btn btn-primary">
-                            <i class="fas fa-eye me-2"></i>View Original
-                        </a>
-                        <a href="/api/invoices/@Model.InvoiceID/file" download class="btn btn-outline-primary">
-                            <i class="fas fa-download me-2"></i>Download
-                        </a>
-                    </div>
+                    <a href="/api/invoices/@Model.InvoiceID/file" target="_blank" class="btn btn-outline-primary">
+                        <i class="fas fa-download me-2"></i>View Original
+                    </a>
                     
                     @* Approval Controls *@
                     @if (!Model.Approved)
@@ -120,14 +115,6 @@
                                     <td><strong>Total Cost:</strong></td>
                                     <td><h5 class="text-success mb-0">$@Model.TotalCost.ToString("N2")</h5></td>
                                 </tr>
-                                <tr>
-                                    <td><strong>Parts Cost:</strong></td>
-                                    <td><span class="fs-5">$@Model.TotalPartsCost.ToString("N2")</span></td>
-                                </tr>
-                                <tr>
-                                    <td><strong>Labor Cost:</strong></td>
-                                    <td><span class="fs-5">$@Model.TotalLaborCost.ToString("N2")</span></td>
-                                </tr>
                                 @if (Model.ConfidenceScore.HasValue)
                                 {
                                     <tr>
@@ -135,9 +122,31 @@
                                         <td>
                                             @{
                                                 var confidence = Model.ConfidenceScore.Value;
-                                                var badgeClass = confidence >= 90 ? "bg-success" : confidence >= 75 ? "bg-warning" : "bg-danger";
+                                                // Handle all confidence formats:
+                                                // - If between 0 and 1: treat as decimal (0.95 = 95%)
+                                                // - If between 1 and 100: treat as percentage (95.0 = 95%)
+                                                // - If > 100: treat as inflated percentage (9500 = 95%)
+                                                decimal displayConfidence;
+                                                
+                                                if (confidence <= 1.0m)
+                                                {
+                                                    // Decimal format (0.95 = 95%)
+                                                    displayConfidence = confidence * 100;
+                                                }
+                                                else if (confidence <= 100.0m)
+                                                {
+                                                    // Percentage format (95.0 = 95%)
+                                                    displayConfidence = confidence;
+                                                }
+                                                else
+                                                {
+                                                    // Inflated percentage format (9500 = 95%)
+                                                    displayConfidence = confidence / 100;
+                                                }
+                                                
+                                                var badgeClass = displayConfidence >= 90 ? "bg-success" : displayConfidence >= 75 ? "bg-warning" : "bg-danger";
                                             }
-                                            <span class="badge @badgeClass fs-6">@confidence.ToString("F1")%</span>
+                                            <span class="badge @badgeClass fs-6">@displayConfidence.ToString("F1")%</span>
                                         </td>
                                     </tr>
                                 }
@@ -234,10 +243,32 @@
                                             <td>
                                                 @if (line.ClassificationConfidence.HasValue)
                                                 {
-                                                    var classConfidence = line.ClassificationConfidence.Value; // Use value as-is (already a percentage as decimal)
-                                                    var classBadgeClass = classConfidence >= 0.90m ? "bg-success" : classConfidence >= 0.75m ? "bg-warning" : "bg-danger";
+                                                    var classConfidence = line.ClassificationConfidence.Value;
+                                                    // Handle all confidence formats:
+                                                    // - If between 0 and 1: treat as decimal (0.95 = 95%)
+                                                    // - If between 1 and 100: treat as percentage (95.0 = 95%)
+                                                    // - If > 100: treat as inflated percentage (9500 = 95%)
+                                                    decimal displayClassConfidence;
+                                                    
+                                                    if (classConfidence <= 1.0m)
+                                                    {
+                                                        // Decimal format (0.95 = 95%)
+                                                        displayClassConfidence = classConfidence * 100;
+                                                    }
+                                                    else if (classConfidence <= 100.0m)
+                                                    {
+                                                        // Percentage format (95.0 = 95%)
+                                                        displayClassConfidence = classConfidence;
+                                                    }
+                                                    else
+                                                    {
+                                                        // Inflated percentage format (9500 = 95%)
+                                                        displayClassConfidence = classConfidence / 100;
+                                                    }
+                                                    
+                                                    var classBadgeClass = displayClassConfidence >= 90 ? "bg-success" : displayClassConfidence >= 75 ? "bg-warning" : "bg-danger";
                                                     <div>
-                                                        <span class="badge @classBadgeClass">@((classConfidence * 100).ToString("F0"))%</span>
+                                                        <span class="badge @classBadgeClass">@displayClassConfidence.ToString("F0")%</span>
                                                         <br />
                                                         <small class="text-muted">Classification</small>
                                                     </div>
@@ -245,9 +276,31 @@
                                                 else if (line.ConfidenceScore.HasValue)
                                                 {
                                                     var lineConfidence = line.ConfidenceScore.Value;
-                                                    var lineBadgeClass = lineConfidence >= 90 ? "bg-success" : lineConfidence >= 75 ? "bg-warning" : "bg-danger";
+                                                    // Handle all confidence formats:
+                                                    // - If between 0 and 1: treat as decimal (0.95 = 95%)
+                                                    // - If between 1 and 100: treat as percentage (95.0 = 95%)
+                                                    // - If > 100: treat as inflated percentage (9500 = 95%)
+                                                    decimal displayLineConfidence;
+                                                    
+                                                    if (lineConfidence <= 1.0m)
+                                                    {
+                                                        // Decimal format (0.95 = 95%)
+                                                        displayLineConfidence = lineConfidence * 100;
+                                                    }
+                                                    else if (lineConfidence <= 100.0m)
+                                                    {
+                                                        // Percentage format (95.0 = 95%)
+                                                        displayLineConfidence = lineConfidence;
+                                                    }
+                                                    else
+                                                    {
+                                                        // Inflated percentage format (9500 = 95%)
+                                                        displayLineConfidence = lineConfidence / 100;
+                                                    }
+                                                    
+                                                    var lineBadgeClass = displayLineConfidence >= 90 ? "bg-success" : displayLineConfidence >= 75 ? "bg-warning" : "bg-danger";
                                                     <div>
-                                                        <span class="badge @lineBadgeClass">@lineConfidence.ToString("F0")%</span>
+                                                        <span class="badge @lineBadgeClass">@displayLineConfidence.ToString("F0")%</span>
                                                         <br />
                                                         <small class="text-muted">Extraction</small>
                                                     </div>

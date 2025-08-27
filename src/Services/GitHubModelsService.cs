@@ -20,7 +20,16 @@ namespace VehicleMaintenanceInvoiceSystem.Services
             _httpClient = httpClient;
             _logger = logger;
             _configuration = configuration;
-            _apiToken = _configuration["GitHubModels:ApiToken"] ?? "";
+            
+            // Get GitHub API token from configuration or environment variable
+            _apiToken = _configuration["GitHubModels:ApiToken"] ?? 
+                       Environment.GetEnvironmentVariable("GITHUB_API_TOKEN") ?? 
+                       "";
+            
+            if (string.IsNullOrEmpty(_apiToken))
+            {
+                _logger.LogWarning("GitHub Models API token not configured. Set GitHubModels:ApiToken in appsettings or GITHUB_API_TOKEN environment variable.");
+            }
             
             // Configure headers for GitHub Models
             _httpClient.DefaultRequestHeaders.Clear();
@@ -71,12 +80,12 @@ namespace VehicleMaintenanceInvoiceSystem.Services
                 var response = await _httpClient.PostAsync($"{_baseUrl}/chat/completions", content);
                 var responseContent = await response.Content.ReadAsStringAsync();
                 
-                _logger.LogInformation("GitHub Models API response: Status={Status}, Content={Content}", 
-                                     response.StatusCode, responseContent.Length > 200 ? responseContent[..200] + "..." : responseContent);
+                _logger.LogInformation("GitHub Models API response: Status={Status}, ContentLength={Length}", 
+                                     response.StatusCode, responseContent?.Length ?? 0);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseContent ?? string.Empty);
                     
                     if (result.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                     {
@@ -210,27 +219,20 @@ Original Form Recognizer Data:";
 You are an expert automotive invoice processor. Analyze the following simplified invoice data and provide a comprehensive structured response with all required fields.
 
 CRITICAL INSTRUCTIONS:
-1. Return ONLY valid JSON - no markdown, no explanations, no extra text
-2. Normalize header fields to extract key information
-3. Classify each line item as: Part, Labor, Fee, Tax, or Other
-4. Generate a standardized professional maintenance summary
-5. Extract part numbers when present
-6. Provide confidence scores for all extractions
+1. Return ONLY valid JSON - NO markdown blocks, NO explanations, NO extra text, NO backticks, NO ```json``` wrapper
+2. Start response immediately with { and end with } - NO other content
+3. Normalize header fields to extract key information
+4. Classify each line item as: Part, Labor, Fee, Tax, or Other
+5. Generate a standardized professional maintenance summary
+6. Extract part numbers when present
+7. Provide confidence scores for all extractions
+
+⚠️ CRITICAL: Your response must start with { and end with } - absolutely no other text or formatting!
 
 *** ABSOLUTE CLASSIFICATION RULES - THESE ARE MANDATORY ***
 
 🔧 LABOR = Any work performed by technicians (services, installations, replacements)
 📦 PART = Physical items/products being sold (the actual part itself)
-
-*** MANDATORY CLASSIFICATION DECISIONS ***
-✅ ""Cabin Filter Replacement"" = Labor (NOT Part) - This is WORK to replace the filter
-✅ ""Engine Filter Replacement"" = Labor (NOT Part) - This is WORK to replace the filter  
-✅ ""Oil Change Service"" = Labor (NOT Part) - This is WORK to change oil
-✅ ""Brake Pad Installation"" = Labor (NOT Part) - This is WORK to install pads
-
-📦 ""Cabin Air Filter"" = Part (NOT Labor) - This is the PHYSICAL filter being sold
-📦 ""Engine Oil"" = Part (NOT Labor) - This is the PHYSICAL oil being sold
-📦 ""Brake Pads"" = Part (NOT Labor) - This is the PHYSICAL pads being sold
 
 *** KEYWORD DETECTION RULES ***
 IF description contains: replacement, installation, service, repair, change, maintenance, mount, install, replace → MUST BE Labor
@@ -241,14 +243,6 @@ Tax: Government taxes and fees
 Other: Miscellaneous charges that don't fit above categories
 
 STANDARDIZED DESCRIPTIONS:
-- Oil/fluid services → ""Oil Change Service""
-- Multiple brake items → ""Brake System Service""
-- Engine work → ""Engine Service""
-- Diagnostic work → ""System Diagnostics""
-- Mixed maintenance → ""Routine Maintenance""
-- General service → ""General Service""
-
-REQUIRED JSON RESPONSE FORMAT:
 - Oil/fluid services → ""Oil Change Service""
 - Multiple brake items → ""Brake System Service""
 - Engine work → ""Engine Service""
@@ -286,15 +280,13 @@ REQUIRED JSON RESPONSE FORMAT:
 Simplified Invoice Data:
 " + simplifiedData;
 
-                // Log the full prompt being sent to GPT-4o for debugging
-                _logger.LogInformation("GPT-4o Prompt being sent (length: {PromptLength} chars):\n{Prompt}", 
-                    prompt.Length, prompt);
+                // Avoid logging full prompt to limit PII exposure; log only length at Debug
+                _logger.LogDebug("GPT-4o prompt length: {PromptLength} chars", prompt.Length);
 
                 var result = await ProcessInvoiceTextAsync(simplifiedData, prompt);
                 
-                // Log the GPT-4o response for debugging classification issues
-                _logger.LogInformation("GPT-4o Response received (length: {ResponseLength} chars):\n{Response}", 
-                    result?.Length ?? 0, result);
+                // Avoid logging full response to limit PII exposure; log only length at Debug
+                _logger.LogDebug("GPT-4o response length: {ResponseLength} chars", result?.Length ?? 0);
                 
                 if (string.IsNullOrEmpty(result))
                 {
@@ -323,6 +315,23 @@ Simplified Invoice Data:
                 try
                 {
                     var cleanedResult = ExtractJsonFromMarkdown(result);
+                    
+                    // Log the cleaned result length at Debug (avoid dumping content to limit PII exposure)
+                    _logger.LogDebug("Attempting to parse cleaned JSON (length: {Length} chars)", 
+                        cleanedResult?.Length ?? 0);
+                    
+                    if (string.IsNullOrWhiteSpace(cleanedResult))
+                    {
+                        _logger.LogError("Cleaned result is empty or null");
+                        return new ComprehensiveInvoiceProcessingResult
+                        {
+                            Success = false,
+                            ErrorMessage = "GPT-4o returned empty response after cleaning",
+                            ProcessingMethod = "GPT4o-EmptyResponse",
+                            ProcessingNotes = { $"Original response: {result}" }
+                        };
+                    }
+                    
                     var jsonResponse = JsonSerializer.Deserialize<JsonElement>(cleanedResult);
                     
                     var comprehensiveResult = new ComprehensiveInvoiceProcessingResult
@@ -362,14 +371,18 @@ Simplified Invoice Data:
                                 Quantity = GetDecimalProperty(item, "quantity"),
                                 TotalCost = GetDecimalProperty(item, "totalCost"),
                                 PartNumber = GetStringProperty(item, "partNumber"),
-                                Confidence = GetDecimalProperty(item, "confidence")
+                                // Convert confidence from 0-1 decimal format to 0-100 percentage format
+                                Confidence = GetDecimalProperty(item, "confidence") <= 1.0m 
+                                    ? GetDecimalProperty(item, "confidence") * 100 
+                                    : GetDecimalProperty(item, "confidence")
                             };
                             comprehensiveResult.LineItems.Add(lineItem);
                         }
                     }
 
-                    // Parse overall confidence
-                    comprehensiveResult.OverallConfidence = GetDecimalProperty(jsonResponse, "overallConfidence");
+                    // Parse overall confidence - convert from 0-1 decimal format to 0-100 percentage format
+                    var rawConfidence = GetDecimalProperty(jsonResponse, "overallConfidence");
+                    comprehensiveResult.OverallConfidence = rawConfidence <= 1.0m ? rawConfidence * 100 : rawConfidence;
 
                     // Parse processing notes
                     if (jsonResponse.TryGetProperty("processingNotes", out var notes) && notes.ValueKind == JsonValueKind.Array)
@@ -388,14 +401,31 @@ Simplified Invoice Data:
                 }
                 catch (JsonException jsonEx)
                 {
-                    _logger.LogError(jsonEx, "Failed to parse GPT-4o JSON response: {Response}", result.Length > 500 ? result[..500] + "..." : result);
+                    var cleanedResult = result != null ? ExtractJsonFromMarkdown(result) : null;
+                    
+                    _logger.LogWarning(jsonEx, "Failed to parse GPT-4o JSON response. Original response length: {OriginalLength}, Cleaned response length: {CleanedLength}", 
+                        result?.Length ?? 0, 
+                        cleanedResult?.Length ?? 0);
+                    
+                    // Log reduced-size samples at Debug to limit PII exposure and log volume
+                    var originalSample = result?.Length > 300 ? result[..300] + "..." : result;
+                    var cleanedSample = cleanedResult?.Length > 300 ? cleanedResult[..300] + "..." : cleanedResult;
+                    
+                    _logger.LogDebug("Original response sample: {OriginalSample}", originalSample);
+                    _logger.LogDebug("Cleaned response sample: {CleanedSample}", cleanedSample);
                     
                     return new ComprehensiveInvoiceProcessingResult
                     {
                         Success = false,
                         ErrorMessage = $"Invalid JSON response from GPT-4o: {jsonEx.Message}",
                         ProcessingMethod = "GPT4o-JsonError",
-                        ProcessingNotes = { $"Raw response: {result}" }
+                        ProcessingNotes = { 
+                            $"JSON parsing error: {jsonEx.Message}",
+                            $"Original response length: {result?.Length ?? 0}",
+                            $"Cleaned response length: {cleanedSample?.Length ?? 0}",
+                            $"Original response preview: {originalSample ?? "null"}",
+                            $"Cleaned response preview: {cleanedSample ?? "null"}"
+                        }
                     };
                 }
             }
@@ -580,28 +610,39 @@ Simplified Invoice Data:
                 cleaned.Length > 50 ? cleaned.Substring(0, 50) : cleaned);
             
             // Handle ```json ... ``` blocks
-            if (cleaned.StartsWith("```json"))
+            if (cleaned.Contains("```json"))
             {
-                var startIndex = cleaned.IndexOf('\n');
-                var endIndex = cleaned.LastIndexOf("```");
-                if (startIndex > 0 && endIndex > startIndex)
+                var jsonStart = cleaned.IndexOf("```json") + 7; // Skip "```json"
+                var nextNewline = cleaned.IndexOf('\n', jsonStart);
+                if (nextNewline > jsonStart)
                 {
-                    var extracted = cleaned.Substring(startIndex + 1, endIndex - startIndex - 1).Trim();
+                    jsonStart = nextNewline + 1;
+                }
+                
+                var endIndex = cleaned.IndexOf("```", jsonStart);
+                if (endIndex > jsonStart)
+                {
+                    var extracted = cleaned.Substring(jsonStart, endIndex - jsonStart).Trim();
                     _logger.LogDebug("Extracted JSON from ```json block: {Length} chars", extracted.Length);
                     return extracted;
                 }
             }
             
-            // Handle ``` ... ``` blocks without language specifier
-            if (cleaned.StartsWith("```") && cleaned.EndsWith("```") && cleaned.Length > 6)
+            // Handle ``` ... ``` blocks without language specifier but containing JSON
+            if (cleaned.Contains("```"))
             {
-                var startIndex = cleaned.IndexOf('\n');
-                var endIndex = cleaned.LastIndexOf("```");
-                if (startIndex > 0 && endIndex > startIndex)
+                var firstBackticks = cleaned.IndexOf("```");
+                var startIndex = cleaned.IndexOf('\n', firstBackticks);
+                var endIndex = cleaned.IndexOf("```", firstBackticks + 3);
+                if (startIndex > firstBackticks && endIndex > startIndex)
                 {
                     var extracted = cleaned.Substring(startIndex + 1, endIndex - startIndex - 1).Trim();
-                    _logger.LogDebug("Extracted JSON from ``` block: {Length} chars", extracted.Length);
-                    return extracted;
+                    // Check if this looks like JSON
+                    if (extracted.StartsWith("{") && extracted.EndsWith("}"))
+                    {
+                        _logger.LogDebug("Extracted JSON from ``` block: {Length} chars", extracted.Length);
+                        return extracted;
+                    }
                 }
             }
             
@@ -613,8 +654,39 @@ Simplified Invoice Data:
                 return extracted;
             }
             
-            _logger.LogDebug("No markdown detected, returning original content: {Length} chars", cleaned.Length);
-            // Return as-is if no markdown detected
+            // Look for JSON object patterns in the text (most aggressive approach)
+            var openBrace = cleaned.IndexOf('{');
+            if (openBrace >= 0)
+            {
+                // Find the matching closing brace by counting braces
+                int braceCount = 0;
+                int closeBrace = -1;
+                
+                for (int i = openBrace; i < cleaned.Length; i++)
+                {
+                    if (cleaned[i] == '{')
+                        braceCount++;
+                    else if (cleaned[i] == '}')
+                    {
+                        braceCount--;
+                        if (braceCount == 0)
+                        {
+                            closeBrace = i;
+                            break;
+                        }
+                    }
+                }
+                
+                if (closeBrace > openBrace)
+                {
+                    var extracted = cleaned.Substring(openBrace, closeBrace - openBrace + 1).Trim();
+                    _logger.LogDebug("Extracted JSON object from text: {Length} chars", extracted.Length);
+                    return extracted;
+                }
+            }
+            
+            _logger.LogDebug("No JSON pattern detected, returning original content: {Length} chars", cleaned.Length);
+            // Return as-is if no JSON pattern detected
             return cleaned;
         }
 

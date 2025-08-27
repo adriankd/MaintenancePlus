@@ -413,6 +413,7 @@ Thumbs.db
 
 # Runtime logs
 logs/
+SavedLogs/
 *.log
 
 # Generated test outputs

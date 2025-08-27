@@ -29,58 +29,58 @@ public class InvoiceFallbackService : IInvoiceFallbackService
         // Initialize keyword dictionaries
         _partKeywords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["oil filter"] = "Parts - Filter",
-            ["air filter"] = "Parts - Filter", 
-            ["cabin filter"] = "Parts - Filter",
-            ["fuel filter"] = "Parts - Filter",
-            ["brake pad"] = "Parts - Brake",
-            ["brake disc"] = "Parts - Brake",
-            ["brake rotor"] = "Parts - Brake",
-            ["brake fluid"] = "Parts - Brake",
-            ["tire"] = "Parts - Tire",
-            ["wheel"] = "Parts - Tire",
-            ["battery"] = "Parts - Electrical",
-            ["alternator"] = "Parts - Electrical",
-            ["starter"] = "Parts - Electrical",
-            ["spark plug"] = "Parts - Engine",
-            ["belt"] = "Parts - Engine",
-            ["hose"] = "Parts - Engine",
-            ["gasket"] = "Parts - Engine",
-            ["oil"] = "Parts - Fluid",
-            ["coolant"] = "Parts - Fluid",
-            ["transmission fluid"] = "Parts - Fluid"
+            ["oil filter"] = "Part",
+            ["air filter"] = "Part", 
+            ["cabin filter"] = "Part",
+            ["fuel filter"] = "Part",
+            ["brake pad"] = "Part",
+            ["brake disc"] = "Part",
+            ["brake rotor"] = "Part",
+            ["brake fluid"] = "Part",
+            ["tire"] = "Part",
+            ["wheel"] = "Part",
+            ["battery"] = "Part",
+            ["alternator"] = "Part",
+            ["starter"] = "Part",
+            ["spark plug"] = "Part",
+            ["belt"] = "Part",
+            ["hose"] = "Part",
+            ["gasket"] = "Part",
+            ["oil"] = "Part",
+            ["coolant"] = "Part",
+            ["transmission fluid"] = "Part"
         };
 
         _laborKeywords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["oil change"] = "Labor - Maintenance",
-            ["brake service"] = "Labor - Brake", 
-            ["brake repair"] = "Labor - Brake",
-            ["tire rotation"] = "Labor - Tire",
-            ["tire mounting"] = "Labor - Tire",
-            ["wheel alignment"] = "Labor - Suspension",
-            ["alignment"] = "Labor - Suspension",
-            ["diagnostic"] = "Labor - Diagnostic",
-            ["inspection"] = "Labor - Inspection",
-            ["tune up"] = "Labor - Engine",
-            ["engine service"] = "Labor - Engine",
-            ["transmission service"] = "Labor - Transmission",
-            ["cooling system"] = "Labor - Cooling",
-            ["electrical repair"] = "Labor - Electrical",
-            ["suspension repair"] = "Labor - Suspension"
+            ["oil change"] = "Labor",
+            ["brake service"] = "Labor", 
+            ["brake repair"] = "Labor",
+            ["tire rotation"] = "Labor",
+            ["tire mounting"] = "Labor",
+            ["wheel alignment"] = "Labor",
+            ["alignment"] = "Labor",
+            ["diagnostic"] = "Labor",
+            ["inspection"] = "Labor",
+            ["tune up"] = "Labor",
+            ["engine service"] = "Labor",
+            ["transmission service"] = "Labor",
+            ["cooling system"] = "Labor",
+            ["electrical repair"] = "Labor",
+            ["suspension repair"] = "Labor"
         };
 
         _feeKeywords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["shop supplies"] = "Fee - Supply",
-            ["supplies"] = "Fee - Supply",
-            ["disposal fee"] = "Fee - Environmental",
-            ["hazmat fee"] = "Fee - Environmental",
-            ["environmental fee"] = "Fee - Environmental",
-            ["tax"] = "Tax - Sales",
-            ["sales tax"] = "Tax - Sales",
-            ["service fee"] = "Fee - Service",
-            ["handling"] = "Fee - Handling"
+            ["shop supplies"] = "Fee",
+            ["supplies"] = "Fee",
+            ["disposal fee"] = "Fee",
+            ["hazmat fee"] = "Fee",
+            ["environmental fee"] = "Fee",
+            ["tax"] = "Tax",
+            ["sales tax"] = "Tax",
+            ["service fee"] = "Fee",
+            ["handling"] = "Fee"
         };
     }
 
@@ -248,7 +248,7 @@ public class InvoiceFallbackService : IInvoiceFallbackService
             return "General automotive service";
 
         var categories = lineItems
-            .GroupBy(l => l.Classification.Split(' ')[0]) // Get main category (Parts, Labor, etc.)
+            .GroupBy(l => l.Classification) // Use full classification name
             .OrderByDescending(g => g.Count())
             .Take(3)
             .Select(g => g.Key)
@@ -258,7 +258,7 @@ public class InvoiceFallbackService : IInvoiceFallbackService
         {
             return categories[0] switch
             {
-                "Parts" => "Automotive parts replacement",
+                "Part" => "Automotive parts replacement",
                 "Labor" => "Vehicle maintenance service", 
                 "Fee" => "Service fees and charges",
                 "Tax" => "Tax charges",
