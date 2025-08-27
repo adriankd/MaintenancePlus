@@ -26,12 +26,16 @@ public class HomeController : Controller
         try
         {
             // Get KPI data for dashboard
-            var allInvoices = await _invoiceService.GetInvoicesAsync(1, 1000); // Get all invoices for KPIs
+            // Use processed-list endpoint for accurate total count across approved and unapproved
+            var totalsAll = await _invoiceService.GetProcessedInvoicesAsync(1, 1, "all");
+            ViewBag.TotalInvoices = totalsAll.TotalCount;
+
+            // Existing metrics remain based on approved-only list for now
+            var allInvoices = await _invoiceService.GetInvoicesAsync(1, 1000);
             var approvedCount = allInvoices.Items.Count(i => i.Approved);
             var pendingCount = allInvoices.Items.Count(i => !i.Approved);
             var totalValue = allInvoices.Items.Sum(i => i.TotalCost);
 
-            ViewBag.TotalInvoices = allInvoices.TotalCount;
             ViewBag.ApprovedInvoices = approvedCount;
             ViewBag.PendingInvoices = pendingCount;
             ViewBag.TotalValue = totalValue.ToString("N0");
