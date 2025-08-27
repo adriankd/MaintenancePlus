@@ -83,7 +83,8 @@ public class HomeController : Controller
         try
         {
             _logger.LogInformation("Attempting to load invoice details for ID: {InvoiceId}", id);
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
+            // Allow viewing unapproved invoices in MVC to keep the system usable without auth
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(id, includeUnapproved: true);
             
             if (invoice == null)
             {

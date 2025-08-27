@@ -141,7 +141,8 @@ public class InvoicesController : ControllerBase
     {
         try
         {
-            var invoice = await _invoiceService.GetInvoiceByIdAsync(id);
+            // Return invoice regardless of approval status (single-invoice endpoint)
+            var invoice = await _invoiceService.GetInvoiceByIdAsync(id, includeUnapproved: true);
             
             if (invoice == null)
             {

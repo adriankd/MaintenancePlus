@@ -13,7 +13,7 @@ public interface IInvoiceProcessingService
     Task<InvoiceProcessingResponse> ProcessInvoiceAsync(IFormFile file);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page = 1, int pageSize = 20);
     Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(int page = 1, int pageSize = 20, string? status = "all");
-    Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId);
+    Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId, bool includeUnapproved = false);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(string vehicleId, int page = 1, int pageSize = 20);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(DateTime date, int page = 1, int pageSize = 20);
     Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByUploadedDateAsync(DateTime date, int page = 1, int pageSize = 20);
@@ -278,7 +278,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
             ApprovedAt = i.ApprovedAt,
             ApprovedBy = i.ApprovedBy,
             LineItemCount = i.InvoiceLines.Count(),
-            LineItems = i.InvoiceLines.OrderBy(l => l.LineNumber).Select(l => new InvoiceLineDto
+            LineItems = i.InvoiceLines.Select(l => new InvoiceLineDto
             {
                 LineID = l.LineID,
                 LineNumber = l.LineNumber,
@@ -348,7 +348,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(
             ApprovedAt = i.ApprovedAt,
             ApprovedBy = i.ApprovedBy,
             LineItemCount = i.InvoiceLines.Count(),
-            LineItems = i.InvoiceLines.OrderBy(l => l.LineNumber).Select(l => new InvoiceLineDto
+            LineItems = i.InvoiceLines.Select(l => new InvoiceLineDto
             {
                 LineID = l.LineID,
                 LineNumber = l.LineNumber,
@@ -372,17 +372,24 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(
     };
 }
 
-    public async Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId)
+    public async Task<InvoiceDetailsDto?> GetInvoiceByIdAsync(int invoiceId, bool includeUnapproved = false)
     {
         try
         {
             _logger.LogInformation("Starting GetInvoiceByIdAsync for Invoice ID: {InvoiceId}", invoiceId);
             
             _logger.LogInformation("Step 1: Querying database for Invoice ID: {InvoiceId}", invoiceId);
-            var invoice = await _context.InvoiceHeaders
+            var query = _context.InvoiceHeaders
                 .AsNoTracking()
                 .Include(i => i.InvoiceLines)
-                .FirstOrDefaultAsync(i => i.InvoiceID == invoiceId && i.Approved);
+                .Where(i => i.InvoiceID == invoiceId);
+
+            if (!includeUnapproved)
+            {
+                query = query.Where(i => i.Approved);
+            }
+
+            var invoice = await query.FirstOrDefaultAsync();
 
             if (invoice == null)
             {
