@@ -361,6 +361,7 @@ The system processes vehicle maintenance invoices through the following workflow
   - Support pagination for large result sets
   - Include proper HTTP status codes
   - Provide comprehensive error messages
+  - Approval visibility policy: All `/api/invoices` endpoints MUST only return invoices where `Approved = true`. Requests for non-approved invoices MUST NOT disclose existence and SHOULD return HTTP 404 (Not Found).
 
 ### 3.4 User Interface Module
 
@@ -566,13 +567,15 @@ https://[app-name].azurewebsites.net/api
   - `page` (optional): Page number (default: 1)
   - `pageSize` (optional): Items per page (default: 20, max: 100)
   - `classification` (optional): Filter by line item classification status
-  - `approvalStatus` (optional): Filter by approval status
-- **Response**: Paginated list of invoice headers with classification metadata
+  - NOTE: Approval is implicitly filtered to `Approved = true` and cannot be overridden via API
+- **Response**: Paginated list of Approved invoice headers with classification metadata
+- **Approval Visibility**: Only invoices with `Approved = true` are included
 
 #### GET /invoices/{id}
 - **Purpose**: Retrieve specific invoice with line items and classification data
 - **Parameters**: `id` (required): Invoice ID
-- **Response**: Complete invoice details including line items with Part/Labor classifications, confidence scores, and normalization results
+- **Response**: Complete invoice details for Approved invoices, including line items with Part/Labor classifications, confidence scores, and normalization results
+- **Approval Visibility**: If the invoice is not Approved, respond with HTTP 404 (Not Found)
 
 
 #### GET /invoices/date/{date}
@@ -581,7 +584,8 @@ https://[app-name].azurewebsites.net/api
   - date (required): Invoice date in YYYY-MM-DD format
   - page (optional): Page number (default: 1)
   - pageSize (optional): Items per page (default: 20, max: 100)
-- **Response**: Paginated list of invoices matching the specified invoice date
+- **Response**: Paginated list of Approved invoices matching the specified invoice date
+- **Approval Visibility**: Only invoices with `Approved = true` are included
 - **Example**: /invoices/date/2025-08-26?page=1&pageSize=20
 
 #### GET /invoices/uploaded-date/{date}
@@ -590,9 +594,10 @@ https://[app-name].azurewebsites.net/api
   - date (required): Upload date in YYYY-MM-DD format
   - page (optional): Page number (default: 1)
   - pageSize (optional): Items per page (default: 20, max: 100)
-- **Response**: Paginated list of invoices uploaded on the specified date
+- **Response**: Paginated list of Approved invoices uploaded on the specified date
 - **Example**: /invoices/uploaded-date/2025-08-26?page=1&pageSize=20
 - **Use Case**: Track invoices by when they were uploaded to the system vs when they were originally dated
+- **Approval Visibility**: Only invoices with `Approved = true` are included
 
 #### POST /invoices/upload
 - **Purpose**: Upload and process new invoice
@@ -617,6 +622,7 @@ https://[app-name].azurewebsites.net/api
 - **Parameters**: `id` (required): Invoice ID
 - **Response**: Secure redirect to blob storage URL or file stream
 - **Security**: Time-limited access URL with 1-hour expiration
+ - **Approval Visibility**: File access is only available for Approved invoices. Requests for non-approved invoices MUST return HTTP 404 (Not Found).
 
 ### Classification and Feedback Endpoints
 
