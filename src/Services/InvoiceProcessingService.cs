@@ -287,8 +287,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesAsync(int page 
                 Quantity = l.Quantity,
                 TotalLineCost = l.TotalLineCost,
                 PartNumber = l.PartNumber,
-                Category = l.Category,
-                ConfidenceScore = l.ExtractionConfidence
+                Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
+                ConfidenceScore = l.ExtractionConfidence,
+                  ClassifiedCategory = l.ClassifiedCategory, ClassificationConfidence = l.ClassificationConfidence
             }).OrderBy(l => l.LineNumber).ToList()
         })
         .ToListAsync();
@@ -357,8 +358,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(
                 Quantity = l.Quantity,
                 TotalLineCost = l.TotalLineCost,
                 PartNumber = l.PartNumber,
-                Category = l.Category,
-                ConfidenceScore = l.ExtractionConfidence
+                Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
+                ConfidenceScore = l.ExtractionConfidence,
+                  ClassifiedCategory = l.ClassifiedCategory, ClassificationConfidence = l.ClassificationConfidence
             }).OrderBy(l => l.LineNumber).ToList()
         })
         .ToListAsync();
@@ -440,8 +442,7 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetProcessedInvoicesAsync(
                         PartNumber = l.PartNumber,
                         Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : 
                                  (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
-                        ClassifiedCategory = l.ClassifiedCategory,
-                        ClassificationConfidence = l.ClassificationConfidence,
+                        ClassifiedCategory = l.ClassifiedCategory, ClassificationConfidence = l.ClassificationConfidence,
                         ConfidenceScore = l.ExtractionConfidence
                     };
                 })
@@ -515,8 +516,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByVehicleAsync(
                     Quantity = l.Quantity,
                     TotalLineCost = l.TotalLineCost,
                     PartNumber = l.PartNumber,
-                    Category = l.Category,
-                    ConfidenceScore = l.ExtractionConfidence
+                    Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
+                    ConfidenceScore = l.ExtractionConfidence,
+                  ClassifiedCategory = l.ClassifiedCategory, ClassificationConfidence = l.ClassificationConfidence
                 })
                 .ToList()
         })
@@ -580,8 +582,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
                     Quantity = l.Quantity,
                     TotalLineCost = l.TotalLineCost,
                     PartNumber = l.PartNumber,
-                    Category = l.Category,
-                    ConfidenceScore = l.ExtractionConfidence
+                    Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
+                    ConfidenceScore = l.ExtractionConfidence,
+                  ClassifiedCategory = l.ClassifiedCategory, ClassificationConfidence = l.ClassificationConfidence
                 })
                 .ToList()
         })
@@ -645,8 +648,9 @@ public async Task<PaginatedResult<InvoiceSummaryDto>> GetInvoicesByDateAsync(Dat
                         Quantity = l.Quantity,
                         TotalLineCost = l.TotalLineCost,
                         PartNumber = l.PartNumber,
-                        Category = l.Category,
-                        ConfidenceScore = l.ExtractionConfidence
+                        Category = string.IsNullOrWhiteSpace(l.ClassifiedCategory) ? l.Category : (!l.ClassifiedCategory.Equals("Unclassified", StringComparison.OrdinalIgnoreCase) ? l.ClassifiedCategory : l.Category),
+                        ConfidenceScore = l.ExtractionConfidence,
+                  ClassifiedCategory = l.ClassifiedCategory, ClassificationConfidence = l.ClassificationConfidence
                     })
                     .ToList()
             })
@@ -1258,3 +1262,4 @@ public class EnhancedLineItem
     
     public bool HasEnhancements => !string.IsNullOrEmpty(AIPartNumber) || !string.IsNullOrEmpty(AIServiceCategory);
 }
+
