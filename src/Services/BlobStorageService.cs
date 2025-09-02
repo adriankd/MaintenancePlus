@@ -169,7 +169,7 @@ public class BlobStorageService : IBlobStorageService
         {
             // Extract the blob name from the full URL
             var uri = new Uri(blobUrl);
-            var blobName = uri.Segments.Last();
+            var blobName = Uri.UnescapeDataString(uri.Segments.Last());
             
             var containerClient = _blobServiceClient.GetBlobContainerClient(_options.ContainerName);
             var blobClient = containerClient.GetBlobClient(blobName);
@@ -220,7 +220,7 @@ public class BlobStorageService : IBlobStorageService
         {
             // Extract the blob name from the full URL
             var uri = new Uri(blobUrl);
-            var blobName = uri.Segments.Last();
+            var blobName = Uri.UnescapeDataString(uri.Segments.Last());
             
             var containerClient = _blobServiceClient.GetBlobContainerClient(_options.ContainerName);
             var blobClient = containerClient.GetBlobClient(blobName);
